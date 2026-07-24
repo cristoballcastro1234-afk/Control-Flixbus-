@@ -1,5 +1,5 @@
 import type { Config } from "@netlify/functions";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { database } from "../../db/index.js";
 import { turnos } from "../../db/schema.js";
 

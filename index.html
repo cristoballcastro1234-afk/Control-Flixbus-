@@ -91,6 +91,14 @@
         }
         .input-hora {
             width: 100px !important;
+            transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s, color 0.2s;
+        }
+        .input-hora.registrada {
+            background-color: var(--flix-green);
+            border-color: #4f9700;
+            box-shadow: inset 0 0 0 1px rgba(56, 87, 35, 0.18);
+            color: #173300;
+            font-weight: bold;
         }
         .fecha-actual {
             margin-top: 6px;
@@ -334,6 +342,7 @@
     function resetTablero() {
         document.querySelectorAll(".destino-card tbody tr").forEach((fila) => {
             fila.querySelectorAll("input").forEach((input) => { input.value = ""; });
+            fila.querySelectorAll(".input-hora").forEach((input) => { input.classList.remove("registrada"); });
             fila.classList.remove("despachado", "cancelado");
         });
     }
@@ -368,12 +377,11 @@
     // Marca la fila como "despachado"
     function verificarColorUI(prefijo, id, horaReal) {
         const fila = document.getElementById(prefijo + "-" + id);
-        if (fila.classList.contains("cancelado")) return;
-        if (horaReal && horaReal.trim() !== "") {
-            fila.classList.add("despachado");
-        } else {
-            fila.classList.remove("despachado");
-        }
+        const inputHora = document.getElementById("input-hora-" + prefijo + "-" + id);
+        const horarioRegistrado = !fila.classList.contains("cancelado") && !!(horaReal && horaReal.trim() !== "");
+
+        fila.classList.toggle("despachado", horarioRegistrado);
+        inputHora.classList.toggle("registrada", horarioRegistrado);
     }
 
     function aplicarDatos(registros) {
@@ -389,13 +397,7 @@
             if (document.activeElement !== inputHora) inputHora.value = registro.horaReal || "";
 
             fila.classList.toggle("cancelado", !!registro.cancelado);
-            if (registro.cancelado) {
-                fila.classList.remove("despachado");
-            } else if (registro.horaReal && registro.horaReal.trim() !== "") {
-                fila.classList.add("despachado");
-            } else {
-                fila.classList.remove("despachado");
-            }
+            verificarColorUI(registro.destino, registro.slotIndex, registro.horaReal || "");
         });
     }
 
