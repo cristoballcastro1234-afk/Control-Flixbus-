@@ -2,3 +2,7 @@ name = "flixbus-turnos"
 compatibility_date = "2024-09-23"
 pages_build_output_dir = "public"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "flixbus-turnos-db"
+database_id = "876c7345-1b9e-4c19-98ee-e1e52dfba6ac"
