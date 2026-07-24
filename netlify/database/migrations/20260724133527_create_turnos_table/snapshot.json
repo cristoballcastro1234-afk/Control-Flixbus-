@@ -1,0 +1,133 @@
+{
+  "version": "8",
+  "dialect": "postgres",
+  "id": "13cb3413-44d7-4fb7-9f8b-5b5eb2b7f7c8",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "ddl": [
+    {
+      "isRlsEnabled": false,
+      "name": "turnos",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "fecha",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "turnos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "destino",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "turnos"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "slot_index",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "turnos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "hora_plan",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "turnos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "''",
+      "generated": null,
+      "identity": null,
+      "name": "bus_num",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "turnos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "''",
+      "generated": null,
+      "identity": null,
+      "name": "hora_real",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "turnos"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "cancelado",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "turnos"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "turnos"
+    },
+    {
+      "columns": [
+        "fecha",
+        "destino",
+        "slot_index"
+      ],
+      "nameExplicit": false,
+      "name": "turnos_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "turnos"
+    }
+  ],
+  "renames": []
+}
