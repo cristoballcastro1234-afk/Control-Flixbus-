@@ -1,8 +1,3 @@
-
-import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/d1";
-import { turnos } from "../../schema";
-
 interface Env {
   DB: D1Database;
 }
@@ -17,20 +12,24 @@ function json(data: unknown, status = 200) {
   });
 }
 
-// GET /api/turnos?fecha=DD-MM-AAAA
 export const onRequestGet: PagesFunction<Env> = async (context) => {
-  const db = drizzle(context.env.DB, { schema: { turnos } });
   const fecha = new URL(context.request.url).searchParams.get("fecha") || "";
-
   if (!FECHA_PATTERN.test(fecha)) return json({ error: "Fecha inválida" }, 400);
 
-  const registros = await db.select().from(turnos).where(eq(turnos.fecha, fecha));
+  const { results } = await context.env.DB
+    .prepare(
+      `SELECT fecha, destino, slot_index as slotIndex, hora_plan as horaPlan,
+              bus_num as busNum, hora_real as horaReal, cancelado, updated_at as updatedAt
+       FROM turnos WHERE fecha = ?`
+    )
+    .bind(fecha)
+    .all();
+
+  const registros = (results || []).map((r: any) => ({ ...r, cancelado: !!r.cancelado }));
   return json(registros);
 };
 
-// POST /api/turnos  (crea o actualiza un turno)
 export const onRequestPost: PagesFunction<Env> = async (context) => {
-  const db = drizzle(context.env.DB, { schema: { turnos } });
   const payload = await context.request.json<Record<string, unknown>>();
 
   const fecha = String(payload.fecha || "");
@@ -53,14 +52,19 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   const updatedAt = new Date().toISOString();
 
-  const [registro] = await db
-    .insert(turnos)
-    .values({ fecha, destino, slotIndex, horaPlan, busNum, horaReal, cancelado, updatedAt })
-    .onConflictDoUpdate({
-      target: [turnos.fecha, turnos.destino, turnos.slotIndex],
-      set: { horaPlan, busNum, horaReal, cancelado, updatedAt },
-    })
-    .returning();
+  await context.env.DB
+    .prepare(
+      `INSERT INTO turnos (fecha, destino, slot_index, hora_plan, bus_num, hora_real, cancelado, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(fecha, destino, slot_index) DO UPDATE SET
+         hora_plan = excluded.hora_plan,
+         bus_num = excluded.bus_num,
+         hora_real = excluded.hora_real,
+         cancelado = excluded.cancelado,
+         updated_at = excluded.updated_at`
+    )
+    .bind(fecha, destino, slotIndex, horaPlan, busNum, horaReal, cancelado ? 1 : 0, updatedAt)
+    .run();
 
-  return json(registro);
+  return json({ fecha, destino, slotIndex, horaPlan, busNum, horaReal, cancelado, updatedAt });
 };
