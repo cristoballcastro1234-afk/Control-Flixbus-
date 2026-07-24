@@ -1,5 +1,5 @@
 import type { Config } from "@netlify/functions";
-import { and, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { database } from "../../db/index.js";
 import { turnos } from "../../db/schema.js";
 
@@ -13,6 +13,16 @@ function json(data: unknown, status = 200) {
   });
 }
 
+type TurnoPayload = {
+  fecha?: unknown;
+  destino?: unknown;
+  slotIndex?: unknown;
+  horaPlan?: unknown;
+  busNum?: unknown;
+  horaReal?: unknown;
+  cancelado?: unknown;
+};
+
 export default async function handler(request: Request) {
   if (request.method === "GET") {
     const fecha = new URL(request.url).searchParams.get("fecha") || "";
@@ -21,13 +31,14 @@ export default async function handler(request: Request) {
     const registros = await database
       .select()
       .from(turnos)
-      .where(eq(turnos.fecha, fecha));
+      .where(eq(turnos.fecha, fecha))
+      .orderBy(asc(turnos.destino), asc(turnos.slotIndex));
 
     return json(registros);
   }
 
   if (request.method === "POST") {
-    const payload = await request.json();
+    const payload = await request.json() as TurnoPayload;
     const fecha = String(payload.fecha || "");
     const destino = String(payload.destino || "");
     const slotIndex = Number(payload.slotIndex);
@@ -49,7 +60,7 @@ export default async function handler(request: Request) {
       })
       .returning();
 
-    return json(registro);
+    return json(registro, 201);
   }
 
   return json({ error: "Método no permitido" }, 405);
