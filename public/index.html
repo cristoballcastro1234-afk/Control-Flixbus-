@@ -149,8 +149,9 @@
         <table>
             <thead>
                 <tr>
-                    <th>Hora Plan</th>
+                    <th>Horario</th>
                     <th>N° de Bus</th>
+                    <th>Hora Llegada</th>
                     <th>Hora Real Salida</th>
                 </tr>
             </thead>
@@ -162,6 +163,7 @@
                             <tr id="stgo-${index}" data-hora-plan="${hora}">
                                 <td><strong>${hora}</strong></td>
                                 <td><input type="text" id="input-bus-stgo-${index}" placeholder="Ej: 102" oninput="subirDatos('stgo', ${index})"></td>
+                                <td><input type="time" id="input-llegada-stgo-${index}" class="input-hora" oninput="subirDatos('stgo', ${index})"></td>
                                 <td>
                                     <input type="time" id="input-hora-stgo-${index}" class="input-hora" oninput="subirDatos('stgo', ${index})">
                                     <button class="btn-cancelar" onclick="alternarCancelado('stgo', ${index})">X</button>
@@ -180,8 +182,9 @@
         <table>
             <thead>
                 <tr>
-                    <th>Hora Plan</th>
+                    <th>Horario</th>
                     <th>N° de Bus</th>
+                    <th>Hora Llegada</th>
                     <th>Hora Real Salida</th>
                 </tr>
             </thead>
@@ -193,6 +196,7 @@
                             <tr id="cur-${index}" data-hora-plan="${hora}">
                                 <td><strong>${hora}</strong></td>
                                 <td><input type="text" id="input-bus-cur-${index}" placeholder="Ej: 88" oninput="subirDatos('cur', ${index})"></td>
+                                <td><input type="time" id="input-llegada-cur-${index}" class="input-hora" oninput="subirDatos('cur', ${index})"></td>
                                 <td>
                                     <input type="time" id="input-hora-cur-${index}" class="input-hora" oninput="subirDatos('cur', ${index})">
                                     <button class="btn-cancelar" onclick="alternarCancelado('cur', ${index})">X</button>
@@ -211,8 +215,9 @@
         <table>
             <thead>
                 <tr>
-                    <th>Hora Plan</th>
+                    <th>Horario</th>
                     <th>N° de Bus</th>
+                    <th>Hora Llegada</th>
                     <th>Hora Real Salida</th>
                 </tr>
             </thead>
@@ -224,6 +229,7 @@
                             <tr id="scrz-${index}" data-hora-plan="${hora}">
                                 <td><strong>${hora}</strong></td>
                                 <td><input type="text" id="input-bus-scrz-${index}" placeholder="Ej: 45" oninput="subirDatos('scrz', ${index})"></td>
+                                <td><input type="time" id="input-llegada-scrz-${index}" class="input-hora" oninput="subirDatos('scrz', ${index})"></td>
                                 <td>
                                     <input type="time" id="input-hora-scrz-${index}" class="input-hora" oninput="subirDatos('scrz', ${index})">
                                     <button class="btn-cancelar" onclick="alternarCancelado('scrz', ${index})">X</button>
@@ -343,12 +349,14 @@
     function subirDatos(prefijo, id) {
         const fila = document.getElementById(prefijo + "-" + id);
         const busNum = document.getElementById("input-bus-" + prefijo + "-" + id).value;
+        const horaLlegada = document.getElementById("input-llegada-" + prefijo + "-" + id).value;
         const horaReal = document.getElementById("input-hora-" + prefijo + "-" + id).value;
         const cancelado = fila.classList.contains("cancelado");
 
         db.ref("turnos/" + carpetaFecha + "/" + prefijo + "/" + id).set({
             horaPlan: fila.dataset.horaPlan,
             busNum: busNum,
+            horaLlegada: horaLlegada,
             horaReal: horaReal,
             cancelado: cancelado,
         }).then(function () {
@@ -384,9 +392,11 @@
             if (!fila) return;
 
             const inputBus = document.getElementById("input-bus-" + registro.destino + "-" + registro.slotIndex);
+            const inputLlegada = document.getElementById("input-llegada-" + registro.destino + "-" + registro.slotIndex);
             const inputHora = document.getElementById("input-hora-" + registro.destino + "-" + registro.slotIndex);
 
             if (document.activeElement !== inputBus) inputBus.value = registro.busNum || "";
+            if (document.activeElement !== inputLlegada) inputLlegada.value = registro.horaLlegada || "";
             if (document.activeElement !== inputHora) inputHora.value = registro.horaReal || "";
 
             fila.classList.toggle("cancelado", !!registro.cancelado);
