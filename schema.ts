@@ -8,6 +8,7 @@ export const turnos = sqliteTable(
     slotIndex: integer("slot_index").notNull(),
     horaPlan: text("hora_plan").notNull(),
     busNum: text("bus_num").notNull().default(""),
+    horaLlegada: text("hora_llegada").notNull().default(""),
     horaReal: text("hora_real").notNull().default(""),
     // D1/SQLite no tiene tipo boolean nativo: se guarda como 0/1
     // pero Drizzle lo traduce automáticamente a true/false en JS.
