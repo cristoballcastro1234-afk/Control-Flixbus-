@@ -1,0 +1,2 @@
+
+ALTER TABLE turnos ADD COLUMN hora_llegada TEXT NOT NULL DEFAULT '';
