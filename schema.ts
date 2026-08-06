@@ -13,6 +13,9 @@ export const turnos = sqliteTable(
     // D1/SQLite no tiene tipo boolean nativo: se guarda como 0/1
     // pero Drizzle lo traduce automáticamente a true/false en JS.
     cancelado: integer("cancelado", { mode: "boolean" }).notNull().default(false),
+    // Oculta el horario de la vista de hoy (se usa cuando el horario no va a circular),
+    // a diferencia de "cancelado" que es para un bus que sí estaba en curso (ej: panne).
+    eliminado: integer("eliminado", { mode: "boolean" }).notNull().default(false),
     updatedAt: text("updated_at").notNull(),
   },
   (table) => [
