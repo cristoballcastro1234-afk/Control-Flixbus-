@@ -2,8 +2,6 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <!-- Librería para convertir la página a PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registro de Salidas - FlixBus</title>
@@ -157,12 +155,13 @@
             background: none;
             border: none;
             cursor: pointer;
-            font-size: 12px;
-            opacity: 0.45;
-            padding: 0 2px;
+            color: #777;
+            opacity: 0.7;
+            padding: 2px;
             line-height: 1;
+            display: inline-flex;
         }
-        .btn-eliminar:hover { opacity: 1; }
+        .btn-eliminar:hover { opacity: 1; color: var(--flix-red); }
         .eliminado-oculto { display: none !important; }
 
         /* Contenedor con scroll propio para no obligar a hacer scroll de toda la página
@@ -300,6 +299,29 @@
             .metrica-chip .valor { font-size: 17px; }
             .container { gap: 14px; }
         }
+
+        /* Impresión / "Guardar como PDF" del navegador: se usa en vez de una librería
+           externa para evitar los recortes y errores que daba capturar la pantalla. */
+        @media print {
+            .no-pdf { display: none !important; }
+            body { background: white; padding: 0; }
+            header { border-radius: 0; }
+            .container {
+                display: block !important;
+            }
+            .destino-card {
+                box-shadow: none;
+                border: 1px solid #ccc;
+                break-inside: auto;
+                margin-bottom: 16px;
+            }
+            .tabla-scroll {
+                max-height: none !important;
+                overflow: visible !important;
+            }
+            thead th { position: static !important; }
+            tr { break-inside: avoid; }
+        }
     </style>
 </head>
 <body>
@@ -321,7 +343,7 @@
 <div class="barra-controles no-pdf">
     <label for="selector-fecha">Ver horarios del día:</label>
     <input type="date" id="selector-fecha" aria-label="Seleccionar día a visualizar">
-    <button type="button" class="btn-pdf" onclick="descargarPDF()">📄 Descargar Reporte en PDF</button>
+    <button type="button" class="btn-pdf" onclick="descargarPDF()">🖨️ Imprimir / Guardar como PDF</button>
     <span id="sync-indicator" aria-live="polite">Conectando...</span>
 </div>
 
@@ -446,7 +468,7 @@
         const btnEliminar = document.createElement("button");
         btnEliminar.type = "button";
         btnEliminar.className = "btn-eliminar no-pdf";
-        btnEliminar.textContent = "🗑";
+        btnEliminar.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
         btnEliminar.title = "Eliminar este horario de hoy (no circulará)";
         btnEliminar.setAttribute("aria-label", "Eliminar horario de las " + hora + " a " + destino.nombre + ", no circulará hoy");
         btnEliminar.addEventListener("click", function () { eliminarHorario(destino, index, hora); });
@@ -956,29 +978,11 @@
         });
     }
 
-    // Función para descargar la vista completa en PDF (excluye controles interactivos)
+    // Abre el diálogo de impresión del navegador; ahí se puede elegir "Guardar como PDF".
+    // Las reglas @media print se encargan de ocultar los controles y mostrar cada
+    // tabla completa (sin el límite de altura que usan en pantalla).
     function descargarPDF() {
-        const elemento = document.body;
-        const opciones = {
-            margin:       8,
-            filename:     'Registro_FlixBus_' + (carpetaFecha || 'hoy') + '.pdf',
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  {
-                scale: 2,
-                onclone: function (clonedDoc) {
-                    clonedDoc.querySelectorAll(".no-pdf").forEach(function (el) { el.remove(); });
-                    // Las tablas tienen scroll interno para verse bien en pantalla; para el PDF
-                    // se quita ese límite así se ve el listado completo de horarios, no solo lo visible.
-                    clonedDoc.querySelectorAll(".tabla-scroll").forEach(function (el) {
-                        el.style.maxHeight = "none";
-                        el.style.overflow = "visible";
-                    });
-                },
-            },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        html2pdf().set(opciones).from(elemento).save();
+        window.print();
     }
 
     renderTablero();
