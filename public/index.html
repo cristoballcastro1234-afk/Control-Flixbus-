@@ -134,6 +134,36 @@
             border-radius: 4px;
             font-size: 16px;
         }
+        .agregar-wrap {
+            display: flex;
+            gap: 6px;
+            padding: 8px 10px 0;
+            background: white;
+            align-items: center;
+        }
+        .agregar-wrap input[type="time"] { flex: 1; }
+        .btn-agregar {
+            white-space: nowrap;
+            padding: 6px 10px;
+            font-size: 13px;
+        }
+        .hora-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+        .btn-eliminar {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            opacity: 0.45;
+            padding: 0 2px;
+            line-height: 1;
+        }
+        .btn-eliminar:hover { opacity: 1; }
+        .eliminado-oculto { display: none !important; }
 
         /* Contenedor con scroll propio para no obligar a hacer scroll de toda la página
            en listas largas (Santiago tiene más de 50 horarios) */
@@ -289,14 +319,14 @@
 </div>
 
 <div class="barra-controles no-pdf">
-    <label for="selector-fecha">Ver turnos del día:</label>
+    <label for="selector-fecha">Ver horarios del día:</label>
     <input type="date" id="selector-fecha" aria-label="Seleccionar día a visualizar">
     <button type="button" class="btn-pdf" onclick="descargarPDF()">📄 Descargar Reporte en PDF</button>
     <span id="sync-indicator" aria-live="polite">Conectando...</span>
 </div>
 
 <div class="metricas-bar" id="metricas-bar" aria-live="polite">
-    <div class="metrica-chip"><span class="valor" id="metrica-total">0</span><span class="etiqueta">Turnos</span></div>
+    <div class="metrica-chip"><span class="valor" id="metrica-total">0</span><span class="etiqueta">Horarios</span></div>
     <div class="metrica-chip"><span class="valor" id="metrica-despachados">0</span><span class="etiqueta">Despachados</span></div>
     <div class="metrica-chip"><span class="valor" id="metrica-atrasados">0</span><span class="etiqueta">Atrasados</span></div>
     <div class="metrica-chip"><span class="valor" id="metrica-cancelados">0</span><span class="etiqueta">Cancelados</span></div>
@@ -402,15 +432,26 @@
 
     // ---------- Construcción del tablero ----------
 
-    function crearFilaDestino(destino, hora, index) {
+    function crearFilaDestino(destino, hora, index, esManual) {
         const tr = document.createElement("tr");
         tr.id = destino.clave + "-" + index;
         tr.dataset.horaPlan = hora;
+        if (esManual) tr.classList.add("fila-manual");
 
         const tdHora = document.createElement("td");
+        const horaWrap = document.createElement("div");
+        horaWrap.className = "hora-wrap";
         const strong = document.createElement("strong");
         strong.textContent = hora;
-        tdHora.appendChild(strong);
+        const btnEliminar = document.createElement("button");
+        btnEliminar.type = "button";
+        btnEliminar.className = "btn-eliminar no-pdf";
+        btnEliminar.textContent = "🗑";
+        btnEliminar.title = "Eliminar este horario de hoy (no circulará)";
+        btnEliminar.setAttribute("aria-label", "Eliminar horario de las " + hora + " a " + destino.nombre + ", no circulará hoy");
+        btnEliminar.addEventListener("click", function () { eliminarHorario(destino, index, hora); });
+        horaWrap.append(strong, btnEliminar);
+        tdHora.appendChild(horaWrap);
 
         const tdBus = document.createElement("td");
         const inputBus = document.createElement("input");
@@ -475,6 +516,21 @@
         filtroWrap.appendChild(filtroInput);
         card.appendChild(filtroWrap);
 
+        const agregarWrap = document.createElement("div");
+        agregarWrap.className = "agregar-wrap no-pdf";
+        const inputAgregar = document.createElement("input");
+        inputAgregar.type = "time";
+        inputAgregar.className = "input-hora";
+        inputAgregar.id = "input-agregar-" + destino.clave;
+        inputAgregar.setAttribute("aria-label", "Hora del nuevo horario para " + destino.nombre);
+        const btnAgregar = document.createElement("button");
+        btnAgregar.type = "button";
+        btnAgregar.className = "btn-secundario btn-agregar";
+        btnAgregar.textContent = "+ Agregar horario";
+        btnAgregar.addEventListener("click", function () { agregarHorario(destino); });
+        agregarWrap.append(inputAgregar, btnAgregar);
+        card.appendChild(agregarWrap);
+
         const scrollWrap = document.createElement("div");
         scrollWrap.className = "tabla-scroll";
         const table = document.createElement("table");
@@ -512,6 +568,83 @@
             const inputBus = fila.querySelector('input[type="text"]');
             const bus = inputBus ? inputBus.value.toLowerCase() : "";
             fila.style.display = (hora.includes(q) || bus.includes(q)) ? "" : "none";
+        });
+    }
+
+    // ---------- Agregar / eliminar horarios manualmente ----------
+
+    function insertarFilaOrdenada(destinoClave, fila) {
+        const tbody = document.getElementById("tbody-" + destinoClave);
+        if (!tbody) return;
+        const nuevoMin = parseHoraAMinutos(fila.dataset.horaPlan);
+        const siguiente = Array.from(tbody.children).find(function (hijo) {
+            const min = parseHoraAMinutos(hijo.dataset.horaPlan);
+            return min !== null && nuevoMin !== null && min > nuevoMin;
+        });
+        if (siguiente) {
+            tbody.insertBefore(fila, siguiente);
+        } else {
+            tbody.appendChild(fila);
+        }
+    }
+
+    // Oculta un horario de la vista de hoy (ej: no circula ese día). A diferencia de
+    // "cancelado", no queda marcado en rojo: desaparece para que la tabla quede limpia.
+    function eliminarHorario(destino, id, hora) {
+        if (modoHistorico) return;
+        const confirmado = window.confirm(
+            "¿Eliminar el horario de las " + hora + " de " + destino.nombre + "?\n\n" +
+            "Solo se quita de la vista de hoy (no afecta otros días). Si el bus salió pero tuvo un problema (ej: panne), usa el botón \"X\" en vez de esto."
+        );
+        if (!confirmado) return;
+
+        const fila = document.getElementById(destino.clave + "-" + id);
+        const busNum = document.getElementById("input-bus-" + destino.clave + "-" + id).value;
+        const horaLlegada = document.getElementById("input-llegada-" + destino.clave + "-" + id).value;
+        const horaReal = document.getElementById("input-hora-" + destino.clave + "-" + id).value;
+        const cancelado = fila.classList.contains("cancelado");
+
+        db.ref("turnos/" + carpetaFecha + "/" + destino.clave + "/" + id).set({
+            horaPlan: fila.dataset.horaPlan,
+            busNum: busNum,
+            horaLlegada: horaLlegada,
+            horaReal: horaReal,
+            cancelado: cancelado,
+            eliminado: true,
+        }).then(function () {
+            fila.classList.add("eliminado-oculto");
+            actualizarMetricas();
+            marcarProximaSalida();
+        }).catch(function (err) { console.log("Error al eliminar horario:", err); });
+    }
+
+    // Agrega un horario nuevo (bus extra) al día de hoy
+    function agregarHorario(destino) {
+        if (modoHistorico) return;
+        const input = document.getElementById("input-agregar-" + destino.clave);
+        const hora = input.value;
+        if (!hora) {
+            window.alert("Ingresa una hora antes de agregar el horario.");
+            return;
+        }
+        const nuevoSlotIndex = Date.now();
+
+        db.ref("turnos/" + carpetaFecha + "/" + destino.clave + "/" + nuevoSlotIndex).set({
+            horaPlan: hora,
+            busNum: "",
+            horaLlegada: "",
+            horaReal: "",
+            cancelado: false,
+            eliminado: false,
+        }).then(function () {
+            const fila = crearFilaDestino(destino, hora, nuevoSlotIndex, true);
+            insertarFilaOrdenada(destino.clave, fila);
+            actualizarMetricas();
+            marcarProximaSalida();
+            input.value = "";
+        }).catch(function (err) {
+            console.log("Error al agregar horario:", err);
+            window.alert("No se pudo agregar el horario, intenta de nuevo.");
         });
     }
 
@@ -561,12 +694,16 @@
         document.getElementById("banner-historico").style.display = "flex";
         document.getElementById("texto-historico").textContent = "📖 Viendo el día " + clave + " en modo solo lectura";
         document.querySelectorAll("#contenido-a-imprimir input").forEach(function (i) { i.disabled = true; });
-        document.querySelectorAll(".btn-cancelar").forEach(function (b) { b.disabled = true; });
+        document.querySelectorAll(".btn-cancelar, .btn-eliminar, .btn-agregar").forEach(function (b) { b.disabled = true; });
 
         db.ref("turnos/" + clave).once()
             .then(function (registros) {
                 marcarSyncOk();
                 aplicarDatos(registros || []);
+                // Las filas de horarios manuales se crean recién al aplicar los datos,
+                // hay que volver a deshabilitar sus controles.
+                document.querySelectorAll("#contenido-a-imprimir input").forEach(function (i) { i.disabled = true; });
+                document.querySelectorAll(".btn-cancelar, .btn-eliminar, .btn-agregar").forEach(function (b) { b.disabled = true; });
             })
             .catch(function (err) {
                 console.log("Error cargando historial:", err);
@@ -578,7 +715,7 @@
         modoHistorico = false;
         document.getElementById("banner-historico").style.display = "none";
         document.querySelectorAll("#contenido-a-imprimir input").forEach(function (i) { i.disabled = false; });
-        document.querySelectorAll(".btn-cancelar").forEach(function (b) { b.disabled = false; });
+        document.querySelectorAll(".btn-cancelar, .btn-eliminar, .btn-agregar").forEach(function (b) { b.disabled = false; });
         resetTablero();
         carpetaFecha = null;
         document.getElementById("selector-fecha").value = isoDesdeClave(formatearFecha(new Date()).clave);
@@ -607,9 +744,10 @@
 
     // Limpia toda la tabla al cambiar de día operativo o de vista
     function resetTablero() {
+        document.querySelectorAll(".fila-manual").forEach((fila) => fila.remove());
         document.querySelectorAll(".destino-card tbody tr").forEach((fila) => {
             fila.querySelectorAll("input").forEach((input) => { input.value = ""; });
-            fila.classList.remove("despachado", "cancelado", "atrasado", "proxima");
+            fila.classList.remove("despachado", "cancelado", "atrasado", "proxima", "eliminado-oculto");
             const badge = fila.querySelector(".atraso-badge");
             if (badge) badge.textContent = "";
         });
@@ -625,6 +763,7 @@
         const horaLlegada = document.getElementById("input-llegada-" + prefijo + "-" + id).value;
         const horaReal = document.getElementById("input-hora-" + prefijo + "-" + id).value;
         const cancelado = fila.classList.contains("cancelado");
+        const eliminado = fila.classList.contains("eliminado-oculto");
 
         db.ref("turnos/" + carpetaFecha + "/" + prefijo + "/" + id).set({
             horaPlan: fila.dataset.horaPlan,
@@ -632,6 +771,7 @@
             horaLlegada: horaLlegada,
             horaReal: horaReal,
             cancelado: cancelado,
+            eliminado: eliminado,
         }).then(function () {
             verificarColorUI(prefijo, id, horaReal);
         }).catch(function (err) { console.log("Error al subir:", err); });
@@ -712,7 +852,7 @@
             let mejorFila = null;
             let mejorDiff = Infinity;
             Array.from(tbody.children).forEach((fila) => {
-                if (fila.classList.contains("cancelado") || fila.classList.contains("despachado")) return;
+                if (fila.classList.contains("cancelado") || fila.classList.contains("despachado") || fila.classList.contains("eliminado-oculto")) return;
                 const min = parseHoraAMinutos(fila.dataset.horaPlan);
                 if (min === null) return;
                 const diff = min - nowMin;
@@ -729,6 +869,7 @@
     function actualizarMetricas() {
         let total = 0, despachados = 0, cancelados = 0, atrasados = 0;
         document.querySelectorAll(".destino-card tbody tr").forEach((fila) => {
+            if (fila.classList.contains("eliminado-oculto")) return;
             total++;
             if (fila.classList.contains("cancelado")) { cancelados++; return; }
             if (fila.classList.contains("despachado")) {
@@ -770,8 +911,19 @@
     function aplicarDatos(registros) {
         registros.forEach(function (registro) {
             if (!DESTINOS.includes(registro.destino)) return;
-            const fila = document.getElementById(registro.destino + "-" + registro.slotIndex);
-            if (!fila) return;
+            let fila = document.getElementById(registro.destino + "-" + registro.slotIndex);
+
+            if (!fila) {
+                // No existe en la tabla: es un horario agregado manualmente desde otro dispositivo.
+                if (registro.eliminado) return;
+                const destino = DESTINOS_CONFIG.find(function (d) { return d.clave === registro.destino; });
+                if (!destino) return;
+                fila = crearFilaDestino(destino, registro.horaPlan, registro.slotIndex, true);
+                insertarFilaOrdenada(destino.clave, fila);
+            }
+
+            fila.classList.toggle("eliminado-oculto", !!registro.eliminado);
+            if (registro.eliminado) return;
 
             const inputBus = document.getElementById("input-bus-" + registro.destino + "-" + registro.slotIndex);
             const inputLlegada = document.getElementById("input-llegada-" + registro.destino + "-" + registro.slotIndex);
