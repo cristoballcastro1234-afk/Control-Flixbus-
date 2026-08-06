@@ -8,12 +8,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registro de Salidas - FlixBus</title>
     <style>
+        * , *::before, *::after { box-sizing: border-box; }
         :root {
             --flix-green: #73d100;
             --flix-orange: #ff5f00;
             --dark: #222;
             --light: #f4f4f4;
             --flix-red: #ff4d4d;
+            --flix-blue: #2196f3;
+            --flix-amber: #ff9800;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -32,6 +35,76 @@
             margin-bottom: 20px;
         }
         h1 { margin: 0; font-size: 24px; }
+        .fecha-actual {
+            margin-top: 6px;
+            font-size: 14px;
+            font-weight: normal;
+            color: #ddd;
+        }
+
+        /* Barra de controles: fecha a visualizar, PDF, estado de sincronización */
+        .barra-controles {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .barra-controles label { font-size: 14px; }
+        .barra-controles input[type="date"] {
+            padding: 6px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
+        #sync-indicator { font-size: 12px; color: #555; }
+
+        #banner-historico {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background-color: #fff3cd;
+            color: #7a5c00;
+            border: 1px solid #ffe08a;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            text-align: center;
+        }
+        #banner-error {
+            display: none;
+            background-color: #ffe0e0;
+            color: #a30000;
+            border: 1px solid #ffb3b3;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        /* Resumen de métricas del día que se está viendo */
+        .metricas-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .metrica-chip {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            padding: 8px 16px;
+            text-align: center;
+            min-width: 85px;
+        }
+        .metrica-chip .valor { font-size: 20px; font-weight: bold; display: block; }
+        .metrica-chip .etiqueta { font-size: 11px; color: #666; text-transform: uppercase; }
+
         .container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -53,10 +126,28 @@
             font-size: 18px;
             text-transform: uppercase;
         }
+        .filtro-wrap { padding: 8px 10px 0; background: white; }
+        .filtro-input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        /* Contenedor con scroll propio para no obligar a hacer scroll de toda la página
+           en listas largas (Santiago tiene más de 50 horarios) */
+        .tabla-scroll { max-height: 65vh; overflow-y: auto; overflow-x: auto; }
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 14px;
+        }
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            box-shadow: 0 1px 0 #ccc;
         }
         th, td {
             padding: 8px 10px;
@@ -83,22 +174,45 @@
             color: #c00000;
             font-weight: bold;
         }
-        input[type="text"] {
+        tr.atrasado { box-shadow: inset 4px 0 0 var(--flix-amber); }
+        tr.proxima { background-color: #e7f3ff !important; }
+        tr.proxima td:first-child::before {
+            content: "▶ ";
+            color: var(--flix-blue);
+            font-weight: bold;
+        }
+
+        input[type="text"], input[type="time"] {
             width: 75px;
             padding: 4px;
             border: 1px solid #ccc;
             border-radius: 4px;
             text-align: center;
+            font-size: 16px; /* evita el zoom automático de iOS al enfocar el campo */
         }
         .input-hora {
             width: 100px !important;
         }
-        .fecha-actual {
-            margin-top: 6px;
-            font-size: 14px;
-            font-weight: normal;
-            color: #ddd;
+        .celda-salida {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            flex-wrap: wrap;
         }
+        .atraso-badge {
+            font-size: 11px;
+            font-weight: bold;
+            color: #fff;
+            background-color: var(--flix-amber);
+            padding: 2px 5px;
+            border-radius: 10px;
+            display: none;
+        }
+        .atraso-badge:not(:empty) { display: inline-block; }
+
+        input:disabled, button:disabled { opacity: 0.6; cursor: not-allowed; }
+
         .btn-cancelar {
             background-color: #777;
             border: none;
@@ -108,11 +222,21 @@
             cursor: pointer;
             font-size: 11px;
             font-weight: bold;
-            margin-left: 3px;
         }
         .btn-cancelar:hover {
             background-color: var(--flix-red);
         }
+        .btn-secundario {
+            background-color: #555;
+            border: none;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .btn-secundario:hover { background-color: #333; }
         /* Botón de exportación PDF */
         .btn-pdf {
             background-color: var(--flix-green);
@@ -123,7 +247,6 @@
             font-weight: bold;
             border-radius: 6px;
             cursor: pointer;
-            margin-top: 15px;
             box-shadow: 0 3px 5px rgba(0,0,0,0.2);
             transition: transform 0.2s, background-color 0.2s;
         }
@@ -131,127 +254,86 @@
             background-color: #61b300;
             transform: scale(1.02);
         }
+
+        @media (max-width: 640px) {
+            body { padding: 10px; }
+            h1 { font-size: 19px; }
+            .barra-controles { flex-direction: column; align-items: stretch; }
+            .barra-controles > * { width: 100%; }
+            #sync-indicator { text-align: center; }
+            th, td { padding: 6px 4px; font-size: 12.5px; }
+            input[type="text"] { width: 56px; padding: 5px 3px; }
+            .input-hora { width: 82px !important; padding: 5px 3px; }
+            .btn-cancelar { padding: 7px 9px; font-size: 12px; }
+            .tabla-scroll { max-height: 52vh; }
+            .metrica-chip { min-width: 68px; padding: 6px 10px; }
+            .metrica-chip .valor { font-size: 17px; }
+            .container { gap: 14px; }
+        }
     </style>
 </head>
 <body>
 
 <header>
     <h1>REGISTRO EN TIEMPO REAL - FLIXBUS</h1>
-    <div id="fecha-actual" class="fecha-actual">jueves 23 de julio de 2026</div>
-    <button class="btn-pdf" onclick="descargarPDF()">📄 Descargar Reporte en PDF</button>
+    <div id="fecha-actual" class="fecha-actual"></div>
 </header>
 
-<div class="container" id="contenido-a-imprimir">
-
-    <!-- DESTINO SANTIAGO -->
-    <div class="destino-card">
-        <div class="destino-header">Destino: Santiago</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Horario</th>
-                    <th>N° de Bus</th>
-                    <th>Hora Llegada</th>
-                    <th>Hora Real Salida</th>
-                </tr>
-            </thead>
-            <tbody>
-                <script>
-                    const horasSantiago = ["5:45", "6:00", "6:15", "6:45", "6:50", "7:15", "7:45", "7:50", "8:15", "8:30", "8:45", "9:00", "9:15", "9:45", "10:05", "10:25", "10:45", "10:55", "11:15", "11:45", "12:15", "12:25", "12:45", "13:15", "13:45", "14:00", "14:15", "14:25", "14:45", "15:00", "15:15", "15:45", "16:00", "16:25", "16:30", "16:45", "16:55", "17:15", "17:25", "17:45", "18:00", "18:15", "18:25", "18:45", "19:00", "19:15", "19:30", "19:45", "20:00", "20:15", "20:30", "21:00", "21:30"];
-                    horasSantiago.forEach((hora, index) => {
-                        document.write(`
-                            <tr id="stgo-${index}" data-hora-plan="${hora}">
-                                <td><strong>${hora}</strong></td>
-                                <td><input type="text" id="input-bus-stgo-${index}" placeholder="Ej: 102" oninput="subirDatos('stgo', ${index})"></td>
-                                <td><input type="time" id="input-llegada-stgo-${index}" class="input-hora" oninput="subirDatos('stgo', ${index})"></td>
-                                <td>
-                                    <input type="time" id="input-hora-stgo-${index}" class="input-hora" oninput="subirDatos('stgo', ${index})">
-                                    <button class="btn-cancelar" onclick="alternarCancelado('stgo', ${index})">X</button>
-                                </td>
-                            </tr>
-                        `);
-                    });
-                </script>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- DESTINO CURICÓ -->
-    <div class="destino-card">
-        <div class="destino-header">Destino: Curicó</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Horario</th>
-                    <th>N° de Bus</th>
-                    <th>Hora Llegada</th>
-                    <th>Hora Real Salida</th>
-                </tr>
-            </thead>
-            <tbody>
-                <script>
-                    const horasCurico = ["7:20", "7:50", "8:20", "8:35", "8:50", "9:05", "9:20", "10:05", "10:35", "11:25", "11:35", "12:05", "12:35", "13:25", "14:35", "15:05", "15:25", "15:30", "16:05", "16:40", "17:05", "17:25", "17:40", "18:05", "18:35", "19:05", "19:25", "19:35", "20:05", "20:30", "21:25"];
-                    horasCurico.forEach((hora, index) => {
-                        document.write(`
-                            <tr id="cur-${index}" data-hora-plan="${hora}">
-                                <td><strong>${hora}</strong></td>
-                                <td><input type="text" id="input-bus-cur-${index}" placeholder="Ej: 88" oninput="subirDatos('cur', ${index})"></td>
-                                <td><input type="time" id="input-llegada-cur-${index}" class="input-hora" oninput="subirDatos('cur', ${index})"></td>
-                                <td>
-                                    <input type="time" id="input-hora-cur-${index}" class="input-hora" oninput="subirDatos('cur', ${index})">
-                                    <button class="btn-cancelar" onclick="alternarCancelado('cur', ${index})">X</button>
-                                </td>
-                            </tr>
-                        `);
-                    });
-                </script>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- DESTINO SANTA CRUZ -->
-    <div class="destino-card">
-        <div class="destino-header">Destino: Santa Cruz</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Horario</th>
-                    <th>N° de Bus</th>
-                    <th>Hora Llegada</th>
-                    <th>Hora Real Salida</th>
-                </tr>
-            </thead>
-            <tbody>
-                <script>
-                    const horasSCruz = ["8:05", "10:49", "11:49", "12:49", "13:19", "14:49", "15:49", "18:54", "19:49", "20:49", "21:19"];
-                    horasSCruz.forEach((hora, index) => {
-                        document.write(`
-                            <tr id="scrz-${index}" data-hora-plan="${hora}">
-                                <td><strong>${hora}</strong></td>
-                                <td><input type="text" id="input-bus-scrz-${index}" placeholder="Ej: 45" oninput="subirDatos('scrz', ${index})"></td>
-                                <td><input type="time" id="input-llegada-scrz-${index}" class="input-hora" oninput="subirDatos('scrz', ${index})"></td>
-                                <td>
-                                    <input type="time" id="input-hora-scrz-${index}" class="input-hora" oninput="subirDatos('scrz', ${index})">
-                                    <button class="btn-cancelar" onclick="alternarCancelado('scrz', ${index})">X</button>
-                                </td>
-                            </tr>
-                        `);
-                    });
-                </script>
-            </tbody>
-        </table>
-    </div>
-
+<div id="banner-historico" role="status" aria-live="polite">
+    <span id="texto-historico"></span>
+    <button type="button" id="btn-volver-hoy" class="btn-secundario no-pdf">Volver a hoy</button>
 </div>
 
+<div id="banner-error" class="no-pdf" role="alert" aria-live="assertive">
+    ⚠️ Sin conexión con el servidor. Mostrando los últimos datos disponibles.
+</div>
+
+<div class="barra-controles no-pdf">
+    <label for="selector-fecha">Ver turnos del día:</label>
+    <input type="date" id="selector-fecha" aria-label="Seleccionar día a visualizar">
+    <button type="button" class="btn-pdf" onclick="descargarPDF()">📄 Descargar Reporte en PDF</button>
+    <span id="sync-indicator" aria-live="polite">Conectando...</span>
+</div>
+
+<div class="metricas-bar" id="metricas-bar" aria-live="polite">
+    <div class="metrica-chip"><span class="valor" id="metrica-total">0</span><span class="etiqueta">Turnos</span></div>
+    <div class="metrica-chip"><span class="valor" id="metrica-despachados">0</span><span class="etiqueta">Despachados</span></div>
+    <div class="metrica-chip"><span class="valor" id="metrica-atrasados">0</span><span class="etiqueta">Atrasados</span></div>
+    <div class="metrica-chip"><span class="valor" id="metrica-cancelados">0</span><span class="etiqueta">Cancelados</span></div>
+    <div class="metrica-chip"><span class="valor" id="metrica-pct">—</span><span class="etiqueta">% a tiempo</span></div>
+</div>
+
+<div class="container" id="contenido-a-imprimir"></div>
+
 <script>
-    const DESTINOS = ["stgo", "cur", "scrz"];
+    const DESTINOS_CONFIG = [
+        {
+            clave: "stgo",
+            nombre: "Santiago",
+            horarios: ["5:45", "6:00", "6:15", "6:45", "6:50", "7:15", "7:45", "7:50", "8:15", "8:30", "8:45", "9:00", "9:15", "9:45", "10:05", "10:25", "10:45", "10:55", "11:15", "11:45", "12:15", "12:25", "12:45", "13:15", "13:45", "14:00", "14:15", "14:25", "14:45", "15:00", "15:15", "15:45", "16:00", "16:25", "16:30", "16:45", "16:55", "17:15", "17:25", "17:45", "18:00", "18:15", "18:25", "18:45", "19:00", "19:15", "19:30", "19:45", "20:00", "20:15", "20:30", "21:00", "21:30"],
+        },
+        {
+            clave: "cur",
+            nombre: "Curicó",
+            horarios: ["7:20", "7:50", "8:20", "8:35", "8:50", "9:05", "9:20", "10:05", "10:35", "11:25", "11:35", "12:05", "12:35", "13:25", "14:35", "15:05", "15:25", "15:30", "16:05", "16:40", "17:05", "17:25", "17:40", "18:05", "18:35", "19:05", "19:25", "19:35", "20:05", "20:30", "21:25"],
+        },
+        {
+            clave: "scrz",
+            nombre: "Santa Cruz",
+            horarios: ["8:05", "10:49", "11:49", "12:49", "13:19", "14:49", "15:49", "18:54", "19:49", "20:49", "21:19"],
+        },
+    ];
+    const DESTINOS = DESTINOS_CONFIG.map((d) => d.clave);
     const REALTIME_INTERVAL_MS = 10000;
+    const UMBRAL_ATRASO_MIN = 5;
     const NOMBRES_DIA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
     const NOMBRES_MES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
     let carpetaFecha = null;
     let referenciaTurnos = null;
+    let modoHistorico = false;
+    let ultimoSyncOk = null;
+    let fallosSeguidos = 0;
 
     // Adaptador con la interfaz de Firebase Realtime Database solicitada.
     // Usa Netlify Database y evita exponer claves o credenciales en el navegador.
@@ -277,12 +359,14 @@
                     if (evento !== "value") return;
                     const sincronizar = function () {
                         obtenerDatos().then(function (registros) {
+                            marcarSyncOk();
                             const version = JSON.stringify(registros);
                             if (version === ultimaVersion) return;
                             ultimaVersion = version;
                             callback({ val: function () { return registros; } });
                         }).catch(function (error) {
                             console.log("Error de sincronización:", error);
+                            marcarSyncError();
                         });
                     };
                     sincronizar();
@@ -291,6 +375,9 @@
                 off: function (evento) {
                     if (evento === "value" && intervalo) clearInterval(intervalo);
                     intervalo = null;
+                },
+                once: function () {
+                    return obtenerDatos();
                 },
                 set: function (valor) {
                     if (!destino || slotIndex === undefined) {
@@ -313,6 +400,123 @@
         },
     };
 
+    // ---------- Construcción del tablero ----------
+
+    function crearFilaDestino(destino, hora, index) {
+        const tr = document.createElement("tr");
+        tr.id = destino.clave + "-" + index;
+        tr.dataset.horaPlan = hora;
+
+        const tdHora = document.createElement("td");
+        const strong = document.createElement("strong");
+        strong.textContent = hora;
+        tdHora.appendChild(strong);
+
+        const tdBus = document.createElement("td");
+        const inputBus = document.createElement("input");
+        inputBus.type = "text";
+        inputBus.id = "input-bus-" + destino.clave + "-" + index;
+        inputBus.placeholder = "N° bus";
+        inputBus.setAttribute("aria-label", "Número de bus, salida " + hora + " a " + destino.nombre);
+        inputBus.addEventListener("input", function () { subirDatos(destino.clave, index); });
+        tdBus.appendChild(inputBus);
+
+        const tdLlegada = document.createElement("td");
+        const inputLlegada = document.createElement("input");
+        inputLlegada.type = "time";
+        inputLlegada.className = "input-hora";
+        inputLlegada.id = "input-llegada-" + destino.clave + "-" + index;
+        inputLlegada.setAttribute("aria-label", "Hora de llegada del bus, salida " + hora + " a " + destino.nombre);
+        inputLlegada.addEventListener("input", function () { subirDatos(destino.clave, index); });
+        tdLlegada.appendChild(inputLlegada);
+
+        const tdSalida = document.createElement("td");
+        const celdaSalida = document.createElement("div");
+        celdaSalida.className = "celda-salida";
+        const inputHora = document.createElement("input");
+        inputHora.type = "time";
+        inputHora.className = "input-hora";
+        inputHora.id = "input-hora-" + destino.clave + "-" + index;
+        inputHora.setAttribute("aria-label", "Hora real de salida, programada " + hora + " a " + destino.nombre);
+        inputHora.addEventListener("input", function () { subirDatos(destino.clave, index); });
+        const badgeAtraso = document.createElement("span");
+        badgeAtraso.className = "atraso-badge";
+        badgeAtraso.id = "atraso-" + destino.clave + "-" + index;
+        const btnCancelar = document.createElement("button");
+        btnCancelar.type = "button";
+        btnCancelar.className = "btn-cancelar";
+        btnCancelar.textContent = "X";
+        btnCancelar.setAttribute("aria-label", "Cancelar turno de las " + hora + " a " + destino.nombre);
+        btnCancelar.addEventListener("click", function () { alternarCancelado(destino.clave, index); });
+        celdaSalida.append(inputHora, badgeAtraso, btnCancelar);
+        tdSalida.appendChild(celdaSalida);
+
+        tr.append(tdHora, tdBus, tdLlegada, tdSalida);
+        return tr;
+    }
+
+    function crearTarjetaDestino(destino) {
+        const card = document.createElement("div");
+        card.className = "destino-card";
+
+        const header = document.createElement("div");
+        header.className = "destino-header";
+        header.textContent = "Destino: " + destino.nombre;
+        card.appendChild(header);
+
+        const filtroWrap = document.createElement("div");
+        filtroWrap.className = "filtro-wrap no-pdf";
+        const filtroInput = document.createElement("input");
+        filtroInput.type = "text";
+        filtroInput.className = "filtro-input";
+        filtroInput.placeholder = "Filtrar por hora o N° de bus...";
+        filtroInput.setAttribute("aria-label", "Filtrar turnos de " + destino.nombre);
+        filtroInput.addEventListener("input", function () { filtrarFilas(destino.clave, filtroInput.value); });
+        filtroWrap.appendChild(filtroInput);
+        card.appendChild(filtroWrap);
+
+        const scrollWrap = document.createElement("div");
+        scrollWrap.className = "tabla-scroll";
+        const table = document.createElement("table");
+        const thead = document.createElement("thead");
+        thead.innerHTML = "<tr><th>Horario</th><th>N° de Bus</th><th>Hora Llegada</th><th>Hora Real Salida</th></tr>";
+        const tbody = document.createElement("tbody");
+        tbody.id = "tbody-" + destino.clave;
+        destino.horarios.forEach(function (hora, index) {
+            tbody.appendChild(crearFilaDestino(destino, hora, index));
+        });
+        table.append(thead, tbody);
+        scrollWrap.appendChild(table);
+        card.appendChild(scrollWrap);
+
+        return card;
+    }
+
+    function renderTablero() {
+        const contenedor = document.getElementById("contenido-a-imprimir");
+        contenedor.innerHTML = "";
+        DESTINOS_CONFIG.forEach(function (destino) {
+            contenedor.appendChild(crearTarjetaDestino(destino));
+        });
+    }
+
+    // ---------- Filtro por hora o número de bus ----------
+
+    function filtrarFilas(destinoClave, texto) {
+        const tbody = document.getElementById("tbody-" + destinoClave);
+        if (!tbody) return;
+        const q = texto.trim().toLowerCase();
+        Array.from(tbody.children).forEach(function (fila) {
+            if (!q) { fila.style.display = ""; return; }
+            const hora = (fila.dataset.horaPlan || "").toLowerCase();
+            const inputBus = fila.querySelector('input[type="text"]');
+            const bus = inputBus ? inputBus.value.toLowerCase() : "";
+            fila.style.display = (hora.includes(q) || bus.includes(q)) ? "" : "none";
+        });
+    }
+
+    // ---------- Fecha y navegación entre días ----------
+
     function formatearFecha(fecha) {
         const dia = String(fecha.getDate()).padStart(2, '0');
         const mes = String(fecha.getMonth() + 1).padStart(2, '0');
@@ -320,12 +524,76 @@
         return { clave: dia + "-" + mes + "-" + anio, dia, mes, anio };
     }
 
-    // Muestra la fecha del día en la interfaz y detecta el cambio de día automáticamente
+    function isoDesdeClave(clave) {
+        const partes = clave.split("-");
+        return partes[2] + "-" + partes[1] + "-" + partes[0];
+    }
+
+    function claveDesdeIso(iso) {
+        const partes = iso.split("-");
+        return partes[2] + "-" + partes[1] + "-" + partes[0];
+    }
+
+    function inicializarControlesFecha() {
+        const selector = document.getElementById("selector-fecha");
+        selector.value = isoDesdeClave(formatearFecha(new Date()).clave);
+        selector.addEventListener("change", alCambiarFecha);
+        document.getElementById("btn-volver-hoy").addEventListener("click", volverAHoy);
+    }
+
+    function alCambiarFecha() {
+        const iso = document.getElementById("selector-fecha").value;
+        if (!iso) return;
+        const claveSeleccionada = claveDesdeIso(iso);
+        const hoyClave = formatearFecha(new Date()).clave;
+        if (claveSeleccionada === hoyClave) {
+            volverAHoy();
+            return;
+        }
+        activarModoHistorico(claveSeleccionada);
+    }
+
+    function activarModoHistorico(clave) {
+        modoHistorico = true;
+        if (referenciaTurnos) { referenciaTurnos.off("value"); referenciaTurnos = null; }
+        carpetaFecha = clave;
+        resetTablero();
+        document.getElementById("banner-historico").style.display = "flex";
+        document.getElementById("texto-historico").textContent = "📖 Viendo el día " + clave + " en modo solo lectura";
+        document.querySelectorAll("#contenido-a-imprimir input").forEach(function (i) { i.disabled = true; });
+        document.querySelectorAll(".btn-cancelar").forEach(function (b) { b.disabled = true; });
+
+        db.ref("turnos/" + clave).once()
+            .then(function (registros) {
+                marcarSyncOk();
+                aplicarDatos(registros || []);
+            })
+            .catch(function (err) {
+                console.log("Error cargando historial:", err);
+                marcarSyncError();
+            });
+    }
+
+    function volverAHoy() {
+        modoHistorico = false;
+        document.getElementById("banner-historico").style.display = "none";
+        document.querySelectorAll("#contenido-a-imprimir input").forEach(function (i) { i.disabled = false; });
+        document.querySelectorAll(".btn-cancelar").forEach(function (b) { b.disabled = false; });
+        resetTablero();
+        carpetaFecha = null;
+        document.getElementById("selector-fecha").value = isoDesdeClave(formatearFecha(new Date()).clave);
+        actualizarFecha();
+    }
+
+    // Muestra la fecha actual en el encabezado y detecta el cambio de día automáticamente
     function actualizarFecha() {
         const ahora = new Date();
         const { clave, dia, anio } = formatearFecha(ahora);
         const textoFecha = NOMBRES_DIA[ahora.getDay()] + " " + dia + " de " + NOMBRES_MES[ahora.getMonth()] + " de " + anio;
         document.getElementById("fecha-actual").textContent = textoFecha;
+        marcarProximaSalida();
+
+        if (modoHistorico) return;
 
         if (carpetaFecha !== clave) {
             const esCambioDeDia = carpetaFecha !== null;
@@ -337,16 +605,21 @@
         }
     }
 
-    // Limpia toda la tabla al cambiar de día operativo
+    // Limpia toda la tabla al cambiar de día operativo o de vista
     function resetTablero() {
         document.querySelectorAll(".destino-card tbody tr").forEach((fila) => {
             fila.querySelectorAll("input").forEach((input) => { input.value = ""; });
-            fila.classList.remove("despachado", "cancelado");
+            fila.classList.remove("despachado", "cancelado", "atrasado", "proxima");
+            const badge = fila.querySelector(".atraso-badge");
+            if (badge) badge.textContent = "";
         });
+        actualizarMetricas();
+        marcarProximaSalida();
     }
 
     // Envía el registro de un bus al backend
     function subirDatos(prefijo, id) {
+        if (modoHistorico) return;
         const fila = document.getElementById(prefijo + "-" + id);
         const busNum = document.getElementById("input-bus-" + prefijo + "-" + id).value;
         const horaLlegada = document.getElementById("input-llegada-" + prefijo + "-" + id).value;
@@ -364,9 +637,16 @@
         }).catch(function (err) { console.log("Error al subir:", err); });
     }
 
-    // Acción para el botón "X"
+    // Acción para el botón "X" — pide confirmación solo al cancelar (no al deshacer)
     function alternarCancelado(prefijo, id) {
         const fila = document.getElementById(prefijo + "-" + id);
+        const vaACancelar = !fila.classList.contains("cancelado");
+        if (vaACancelar) {
+            const confirmado = window.confirm(
+                "¿Cancelar el turno de las " + fila.dataset.horaPlan + "?\n\nPuedes deshacerlo presionando el mismo botón."
+            );
+            if (!confirmado) return;
+        }
         fila.classList.toggle("cancelado");
         if (fila.classList.contains("cancelado")) {
             fila.classList.remove("despachado");
@@ -374,15 +654,117 @@
         subirDatos(prefijo, id);
     }
 
-    // Marca la fila como "despachado"
+    // Marca la fila como "despachado" y revisa si hay atraso
     function verificarColorUI(prefijo, id, horaReal) {
         const fila = document.getElementById(prefijo + "-" + id);
-        if (fila.classList.contains("cancelado")) return;
-        if (horaReal && horaReal.trim() !== "") {
-            fila.classList.add("despachado");
-        } else {
-            fila.classList.remove("despachado");
+        if (!fila.classList.contains("cancelado")) {
+            if (horaReal && horaReal.trim() !== "") {
+                fila.classList.add("despachado");
+            } else {
+                fila.classList.remove("despachado");
+            }
         }
+        actualizarAtraso(prefijo, id, fila.dataset.horaPlan, horaReal);
+        actualizarMetricas();
+        marcarProximaSalida();
+    }
+
+    function parseHoraAMinutos(hora) {
+        if (!hora) return null;
+        const partes = hora.split(":");
+        if (partes.length < 2) return null;
+        const h = parseInt(partes[0], 10);
+        const m = parseInt(partes[1], 10);
+        if (Number.isNaN(h) || Number.isNaN(m)) return null;
+        return h * 60 + m;
+    }
+
+    function actualizarAtraso(prefijo, id, horaPlan, horaReal) {
+        const fila = document.getElementById(prefijo + "-" + id);
+        const badge = document.getElementById("atraso-" + prefijo + "-" + id);
+        if (!fila || !badge) return;
+        const minPlan = parseHoraAMinutos(horaPlan);
+        const minReal = parseHoraAMinutos(horaReal);
+        if (fila.classList.contains("cancelado") || minPlan === null || minReal === null) {
+            fila.classList.remove("atrasado");
+            badge.textContent = "";
+            return;
+        }
+        const diff = minReal - minPlan;
+        if (diff > UMBRAL_ATRASO_MIN) {
+            fila.classList.add("atrasado");
+            badge.textContent = "+" + diff + "m";
+        } else {
+            fila.classList.remove("atrasado");
+            badge.textContent = "";
+        }
+    }
+
+    // Resalta el próximo turno pendiente de cada destino (solo tiene sentido para "hoy")
+    function marcarProximaSalida() {
+        document.querySelectorAll("tr.proxima").forEach((tr) => tr.classList.remove("proxima"));
+        if (modoHistorico) return;
+        const ahora = new Date();
+        const nowMin = ahora.getHours() * 60 + ahora.getMinutes();
+        DESTINOS_CONFIG.forEach((destino) => {
+            const tbody = document.getElementById("tbody-" + destino.clave);
+            if (!tbody) return;
+            let mejorFila = null;
+            let mejorDiff = Infinity;
+            Array.from(tbody.children).forEach((fila) => {
+                if (fila.classList.contains("cancelado") || fila.classList.contains("despachado")) return;
+                const min = parseHoraAMinutos(fila.dataset.horaPlan);
+                if (min === null) return;
+                const diff = min - nowMin;
+                if (diff >= -2 && diff < mejorDiff) {
+                    mejorDiff = diff;
+                    mejorFila = fila;
+                }
+            });
+            if (mejorFila) mejorFila.classList.add("proxima");
+        });
+    }
+
+    // Resumen del día: totales, despachados, atrasados, cancelados y % a tiempo
+    function actualizarMetricas() {
+        let total = 0, despachados = 0, cancelados = 0, atrasados = 0;
+        document.querySelectorAll(".destino-card tbody tr").forEach((fila) => {
+            total++;
+            if (fila.classList.contains("cancelado")) { cancelados++; return; }
+            if (fila.classList.contains("despachado")) {
+                despachados++;
+                if (fila.classList.contains("atrasado")) atrasados++;
+            }
+        });
+        const aTiempo = despachados - atrasados;
+        const pct = despachados > 0 ? Math.round((aTiempo / despachados) * 100) : null;
+        document.getElementById("metrica-total").textContent = total;
+        document.getElementById("metrica-despachados").textContent = despachados;
+        document.getElementById("metrica-cancelados").textContent = cancelados;
+        document.getElementById("metrica-atrasados").textContent = atrasados;
+        document.getElementById("metrica-pct").textContent = pct === null ? "—" : pct + "%";
+    }
+
+    // Indicador de sincronización y banner de error de conexión
+    function marcarSyncOk() {
+        ultimoSyncOk = new Date();
+        fallosSeguidos = 0;
+        document.getElementById("banner-error").style.display = "none";
+        actualizarTextoSync();
+    }
+
+    function marcarSyncError() {
+        fallosSeguidos++;
+        if (fallosSeguidos >= 2) document.getElementById("banner-error").style.display = "block";
+        actualizarTextoSync();
+    }
+
+    function actualizarTextoSync() {
+        const el = document.getElementById("sync-indicator");
+        if (!el) return;
+        if (!ultimoSyncOk) { el.textContent = "Conectando..."; return; }
+        const seg = Math.round((Date.now() - ultimoSyncOk.getTime()) / 1000);
+        el.textContent = seg < 5 ? "✅ Sincronizado" : "Última actualización: hace " + seg + "s";
     }
 
     function aplicarDatos(registros) {
@@ -407,7 +789,10 @@
             } else {
                 fila.classList.remove("despachado");
             }
+            actualizarAtraso(registro.destino, registro.slotIndex, registro.horaPlan || fila.dataset.horaPlan, registro.horaReal);
         });
+        actualizarMetricas();
+        marcarProximaSalida();
     }
 
     // Escucha la fecha activa con db.ref('turnos/' + fecha).on('value', ...).
@@ -419,22 +804,33 @@
         });
     }
 
-    // Función para descargar la vista completa en PDF
+    // Función para descargar la vista completa en PDF (excluye controles interactivos)
     function descargarPDF() {
         const elemento = document.body;
         const opciones = {
             margin:       8,
             filename:     'Registro_FlixBus_' + (carpetaFecha || 'hoy') + '.pdf',
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2 },
+            html2canvas:  {
+                scale: 2,
+                onclone: function (clonedDoc) {
+                    clonedDoc.querySelectorAll(".no-pdf").forEach(function (el) { el.remove(); });
+                },
+            },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         html2pdf().set(opciones).from(elemento).save();
     }
 
+    renderTablero();
+    inicializarControlesFecha();
     actualizarFecha();
+    marcarProximaSalida();
+    actualizarMetricas();
+    actualizarTextoSync();
     setInterval(actualizarFecha, 60000);
+    setInterval(actualizarTextoSync, 5000);
 </script>
 
 </body>
