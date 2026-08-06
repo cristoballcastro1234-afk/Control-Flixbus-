@@ -967,6 +967,12 @@
                 scale: 2,
                 onclone: function (clonedDoc) {
                     clonedDoc.querySelectorAll(".no-pdf").forEach(function (el) { el.remove(); });
+                    // Las tablas tienen scroll interno para verse bien en pantalla; para el PDF
+                    // se quita ese límite así se ve el listado completo de horarios, no solo lo visible.
+                    clonedDoc.querySelectorAll(".tabla-scroll").forEach(function (el) {
+                        el.style.maxHeight = "none";
+                        el.style.overflow = "visible";
+                    });
                 },
             },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
