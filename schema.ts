@@ -22,3 +22,15 @@ export const turnos = sqliteTable(
     primaryKey({ columns: [table.fecha, table.destino, table.slotIndex] }),
   ],
 );
+
+export const usuarios = sqliteTable("usuarios", {
+  usuario: text("usuario").primaryKey(),
+  nombre: text("nombre").notNull().default(""),
+  // Formato pbkdf2$<iteraciones>$<salt>$<hash>. Nunca se guarda la contraseña en texto plano.
+  passwordHash: text("password_hash").notNull(),
+  rol: text("rol").notNull().default("operador"),
+  activo: integer("activo", { mode: "boolean" }).notNull().default(true),
+  intentosFallidos: integer("intentos_fallidos").notNull().default(0),
+  bloqueadoHasta: text("bloqueado_hasta").notNull().default(""),
+  creadoEn: text("creado_en").notNull(),
+});
