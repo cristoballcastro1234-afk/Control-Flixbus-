@@ -58,20 +58,28 @@
         }
         #sync-indicator { font-size: 12px; color: #555; }
 
-        #banner-historico {
-            display: none;
+        .barra-usuario {
+            display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 10px;
-            background-color: #fff3cd;
-            color: #7a5c00;
-            border: 1px solid #ffe08a;
-            border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 15px;
-            font-weight: bold;
-            text-align: center;
+            justify-content: flex-end;
+            gap: 12px;
+            flex-wrap: wrap;
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 12px;
         }
+        .barra-usuario a, .barra-usuario button {
+            font-size: 13px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: bold;
+            background-color: #555;
+            color: white;
+        }
+        .barra-usuario a:hover, .barra-usuario button:hover { background-color: #333; }
         #banner-error {
             display: none;
             background-color: #ffe0e0;
@@ -331,9 +339,10 @@
     <div id="fecha-actual" class="fecha-actual"></div>
 </header>
 
-<div id="banner-historico" role="status" aria-live="polite">
-    <span id="texto-historico"></span>
-    <button type="button" id="btn-volver-hoy" class="btn-secundario no-pdf">Volver a hoy</button>
+<div class="barra-usuario no-pdf">
+    <span id="usuario-actual"></span>
+    <a href="/usuarios" id="enlace-usuarios">Mi cuenta</a>
+    <button type="button" id="btn-salir">Cerrar sesión</button>
 </div>
 
 <div id="banner-error" class="no-pdf" role="alert" aria-live="assertive">
@@ -341,8 +350,6 @@
 </div>
 
 <div class="barra-controles no-pdf">
-    <label for="selector-fecha">Ver horarios del día:</label>
-    <input type="date" id="selector-fecha" aria-label="Seleccionar día a visualizar">
     <button type="button" class="btn-pdf" onclick="descargarPDF()">🖨️ Imprimir / Guardar como PDF</button>
     <span id="sync-indicator" aria-live="polite">Conectando...</span>
 </div>
@@ -383,7 +390,6 @@
 
     let carpetaFecha = null;
     let referenciaTurnos = null;
-    let modoHistorico = false;
     let ultimoSyncOk = null;
     let fallosSeguidos = 0;
 
@@ -401,6 +407,7 @@
             function obtenerDatos() {
                 return fetch("/api/turnos?fecha=" + encodeURIComponent(fecha), { cache: "no-store" })
                     .then(function (respuesta) {
+                        if (respuesta.status === 401) return sesionExpirada();
                         if (!respuesta.ok) throw new Error("No se pudieron cargar los turnos");
                         return respuesta.json();
                     });
@@ -428,9 +435,6 @@
                     if (evento === "value" && intervalo) clearInterval(intervalo);
                     intervalo = null;
                 },
-                once: function () {
-                    return obtenerDatos();
-                },
                 set: function (valor) {
                     if (!destino || slotIndex === undefined) {
                         return Promise.reject(new Error("La referencia debe apuntar a un turno"));
@@ -444,6 +448,7 @@
                             slotIndex: Number(slotIndex),
                         })),
                     }).then(function (respuesta) {
+                        if (respuesta.status === 401) return sesionExpirada();
                         if (!respuesta.ok) throw new Error("No se pudo guardar el turno");
                         return respuesta.json();
                     });
@@ -451,6 +456,18 @@
             };
         },
     };
+
+    // Si la sesión venció mientras la página estaba abierta, se vuelve a la pantalla
+    // de acceso en vez de mostrar un error de conexión que confundiría al operador.
+    let redirigiendoALogin = false;
+    function sesionExpirada() {
+        if (!redirigiendoALogin) {
+            redirigiendoALogin = true;
+            window.location.replace("/login");
+        }
+        // Promesa que nunca se resuelve: evita que siga el flujo mientras se redirige.
+        return new Promise(function () {});
+    }
 
     // ---------- Construcción del tablero ----------
 
@@ -613,7 +630,6 @@
     // Oculta un horario de la vista de hoy (ej: no circula ese día). A diferencia de
     // "cancelado", no queda marcado en rojo: desaparece para que la tabla quede limpia.
     function eliminarHorario(destino, id, hora) {
-        if (modoHistorico) return;
         const confirmado = window.confirm(
             "¿Eliminar el horario de las " + hora + " de " + destino.nombre + "?\n\n" +
             "Solo se quita de la vista de hoy (no afecta otros días). Si el bus salió pero tuvo un problema (ej: panne), usa el botón \"X\" en vez de esto."
@@ -642,7 +658,6 @@
 
     // Agrega un horario nuevo (bus extra) al día de hoy
     function agregarHorario(destino) {
-        if (modoHistorico) return;
         const input = document.getElementById("input-agregar-" + destino.clave);
         const hora = input.value;
         if (!hora) {
@@ -679,69 +694,35 @@
         return { clave: dia + "-" + mes + "-" + anio, dia, mes, anio };
     }
 
-    function isoDesdeClave(clave) {
-        const partes = clave.split("-");
-        return partes[2] + "-" + partes[1] + "-" + partes[0];
-    }
+    // ---------- Sesión del usuario ----------
 
-    function claveDesdeIso(iso) {
-        const partes = iso.split("-");
-        return partes[2] + "-" + partes[1] + "-" + partes[0];
-    }
+    function inicializarSesion() {
+        document.getElementById("btn-salir").addEventListener("click", cerrarSesion);
 
-    function inicializarControlesFecha() {
-        const selector = document.getElementById("selector-fecha");
-        selector.value = isoDesdeClave(formatearFecha(new Date()).clave);
-        selector.addEventListener("change", alCambiarFecha);
-        document.getElementById("btn-volver-hoy").addEventListener("click", volverAHoy);
-    }
-
-    function alCambiarFecha() {
-        const iso = document.getElementById("selector-fecha").value;
-        if (!iso) return;
-        const claveSeleccionada = claveDesdeIso(iso);
-        const hoyClave = formatearFecha(new Date()).clave;
-        if (claveSeleccionada === hoyClave) {
-            volverAHoy();
-            return;
-        }
-        activarModoHistorico(claveSeleccionada);
-    }
-
-    function activarModoHistorico(clave) {
-        modoHistorico = true;
-        if (referenciaTurnos) { referenciaTurnos.off("value"); referenciaTurnos = null; }
-        carpetaFecha = clave;
-        resetTablero();
-        document.getElementById("banner-historico").style.display = "flex";
-        document.getElementById("texto-historico").textContent = "📖 Viendo el día " + clave + " en modo solo lectura";
-        document.querySelectorAll("#contenido-a-imprimir input").forEach(function (i) { i.disabled = true; });
-        document.querySelectorAll(".btn-cancelar, .btn-eliminar, .btn-agregar").forEach(function (b) { b.disabled = true; });
-
-        db.ref("turnos/" + clave).once()
-            .then(function (registros) {
-                marcarSyncOk();
-                aplicarDatos(registros || []);
-                // Las filas de horarios manuales se crean recién al aplicar los datos,
-                // hay que volver a deshabilitar sus controles.
-                document.querySelectorAll("#contenido-a-imprimir input").forEach(function (i) { i.disabled = true; });
-                document.querySelectorAll(".btn-cancelar, .btn-eliminar, .btn-agregar").forEach(function (b) { b.disabled = true; });
+        fetch("/api/auth?accion=estado", { cache: "no-store" })
+            .then(function (respuesta) { return respuesta.json(); })
+            .then(function (estado) {
+                if (!estado.sesion) {
+                    window.location.replace("/login");
+                    return;
+                }
+                document.getElementById("usuario-actual").textContent =
+                    "Conectado como " + estado.sesion.usuario +
+                    (estado.sesion.rol === "admin" ? " (administrador)" : "");
+                document.getElementById("enlace-usuarios").textContent =
+                    estado.sesion.rol === "admin" ? "Usuarios" : "Mi cuenta";
             })
-            .catch(function (err) {
-                console.log("Error cargando historial:", err);
-                marcarSyncError();
-            });
+            .catch(function (err) { console.log("No se pudo leer la sesión:", err); });
     }
 
-    function volverAHoy() {
-        modoHistorico = false;
-        document.getElementById("banner-historico").style.display = "none";
-        document.querySelectorAll("#contenido-a-imprimir input").forEach(function (i) { i.disabled = false; });
-        document.querySelectorAll(".btn-cancelar, .btn-eliminar, .btn-agregar").forEach(function (b) { b.disabled = false; });
-        resetTablero();
-        carpetaFecha = null;
-        document.getElementById("selector-fecha").value = isoDesdeClave(formatearFecha(new Date()).clave);
-        actualizarFecha();
+    function cerrarSesion() {
+        fetch("/api/auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ accion: "logout" }),
+        })
+            .catch(function () { /* aunque falle, se manda a la pantalla de acceso */ })
+            .then(function () { window.location.replace("/login"); });
     }
 
     // Muestra la fecha actual en el encabezado y detecta el cambio de día automáticamente
@@ -751,8 +732,6 @@
         const textoFecha = NOMBRES_DIA[ahora.getDay()] + " " + dia + " de " + NOMBRES_MES[ahora.getMonth()] + " de " + anio;
         document.getElementById("fecha-actual").textContent = textoFecha;
         marcarProximaSalida();
-
-        if (modoHistorico) return;
 
         if (carpetaFecha !== clave) {
             const esCambioDeDia = carpetaFecha !== null;
@@ -779,7 +758,6 @@
 
     // Envía el registro de un bus al backend
     function subirDatos(prefijo, id) {
-        if (modoHistorico) return;
         const fila = document.getElementById(prefijo + "-" + id);
         const busNum = document.getElementById("input-bus-" + prefijo + "-" + id).value;
         const horaLlegada = document.getElementById("input-llegada-" + prefijo + "-" + id).value;
@@ -865,7 +843,6 @@
     // Resalta el próximo turno pendiente de cada destino (solo tiene sentido para "hoy")
     function marcarProximaSalida() {
         document.querySelectorAll("tr.proxima").forEach((tr) => tr.classList.remove("proxima"));
-        if (modoHistorico) return;
         const ahora = new Date();
         const nowMin = ahora.getHours() * 60 + ahora.getMinutes();
         DESTINOS_CONFIG.forEach((destino) => {
@@ -986,7 +963,7 @@
     }
 
     renderTablero();
-    inicializarControlesFecha();
+    inicializarSesion();
     actualizarFecha();
     marcarProximaSalida();
     actualizarMetricas();
