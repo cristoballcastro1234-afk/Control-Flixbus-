@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso - Registro de Salidas FlixBus</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        :root {
+            --flix-green: #73d100;
+            --dark: #222;
+            --light: #f4f4f4;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--light);
+            color: var(--dark);
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .tarjeta {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+            border-top: 5px solid var(--flix-green);
+            width: 100%;
+            max-width: 380px;
+            overflow: hidden;
+        }
+        .cabecera {
+            background-color: var(--dark);
+            color: white;
+            padding: 18px;
+            text-align: center;
+        }
+        .cabecera h1 { margin: 0; font-size: 17px; letter-spacing: 0.5px; }
+        .cabecera p { margin: 6px 0 0; font-size: 13px; color: #ccc; }
+        form { padding: 20px; }
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            background-color: var(--flix-green);
+            color: #000;
+            border: none;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover:not(:disabled) { background-color: #61b300; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .mensaje {
+            display: none;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 14px;
+            text-align: center;
+        }
+        .mensaje.error {
+            display: block;
+            background-color: #ffe0e0;
+            color: #a30000;
+            border: 1px solid #ffb3b3;
+        }
+        .aviso-setup {
+            background-color: #fff3cd;
+            color: #7a5c00;
+            border: 1px solid #ffe08a;
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 13px;
+            margin-bottom: 14px;
+        }
+        .ayuda { font-size: 12px; color: #666; margin: -8px 0 14px; }
+    </style>
+</head>
+<body>
+
+<div class="tarjeta">
+    <div class="cabecera">
+        <h1>REGISTRO DE SALIDAS - FLIXBUS</h1>
+        <p id="subtitulo">Ingresa con tu usuario</p>
+    </div>
+
+    <form id="formulario" autocomplete="on">
+        <div id="aviso-setup" class="aviso-setup" style="display:none">
+            Todavía no hay usuarios creados. El primero que se cree será el
+            <strong>administrador</strong>, y podrá dar de alta al resto del equipo.
+        </div>
+
+        <div id="mensaje" class="mensaje" role="alert"></div>
+
+        <label for="usuario">Usuario</label>
+        <input type="text" id="usuario" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+
+        <label for="password">Contraseña</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required>
+        <p id="ayuda-password" class="ayuda" style="display:none">Mínimo 10 caracteres.</p>
+
+        <button type="submit" id="boton">Entrar</button>
+    </form>
+</div>
+
+<script>
+    let modoSetup = false;
+
+    const elFormulario = document.getElementById("formulario");
+    const elMensaje = document.getElementById("mensaje");
+    const elBoton = document.getElementById("boton");
+
+    function mostrarError(texto) {
+        elMensaje.textContent = texto;
+        elMensaje.className = "mensaje error";
+    }
+
+    function limpiarError() {
+        elMensaje.textContent = "";
+        elMensaje.className = "mensaje";
+    }
+
+    // Si no hay ningún usuario todavía, la pantalla pasa a modo "crear administrador".
+    function revisarEstado() {
+        return fetch("/api/auth?accion=estado", { cache: "no-store" })
+            .then(function (respuesta) { return respuesta.json(); })
+            .then(function (estado) {
+                if (estado.sesion) {
+                    window.location.replace("/");
+                    return;
+                }
+                modoSetup = !estado.configurado;
+                if (modoSetup) {
+                    document.getElementById("subtitulo").textContent = "Crear el primer administrador";
+                    document.getElementById("aviso-setup").style.display = "block";
+                    document.getElementById("ayuda-password").style.display = "block";
+                    document.getElementById("password").setAttribute("autocomplete", "new-password");
+                    elBoton.textContent = "Crear administrador";
+                }
+            })
+            .catch(function () {
+                mostrarError("No se pudo contactar al servidor. Revisa la conexión.");
+            });
+    }
+
+    elFormulario.addEventListener("submit", function (evento) {
+        evento.preventDefault();
+        limpiarError();
+        elBoton.disabled = true;
+
+        fetch("/api/auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                accion: modoSetup ? "setup" : "login",
+                usuario: document.getElementById("usuario").value,
+                password: document.getElementById("password").value,
+            }),
+        })
+            .then(function (respuesta) {
+                return respuesta.json().then(function (cuerpo) {
+                    return { ok: respuesta.ok, cuerpo: cuerpo };
+                });
+            })
+            .then(function (resultado) {
+                if (!resultado.ok) {
+                    mostrarError(resultado.cuerpo.error || "No se pudo iniciar sesión");
+                    elBoton.disabled = false;
+                    return;
+                }
+                window.location.replace("/");
+            })
+            .catch(function () {
+                mostrarError("No se pudo contactar al servidor. Revisa la conexión.");
+                elBoton.disabled = false;
+            });
+    });
+
+    revisarEstado();
+</script>
+
+</body>
+</html>
