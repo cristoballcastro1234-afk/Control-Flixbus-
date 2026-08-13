@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuarios - Registro de Salidas FlixBus</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        :root {
+            --flix-green: #73d100;
+            --flix-orange: #ff5f00;
+            --flix-red: #ff4d4d;
+            --dark: #222;
+            --light: #f4f4f4;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--light);
+            color: var(--dark);
+            margin: 0;
+            padding: 20px;
+        }
+        header {
+            background-color: var(--dark);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            border-radius: 8px;
+            border-bottom: 5px solid var(--flix-green);
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 20px; }
+        .contenido { max-width: 780px; margin: 0 auto; }
+        .tarjeta {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-top: 4px solid var(--flix-orange);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .tarjeta h2 {
+            background-color: #333;
+            color: white;
+            margin: 0;
+            padding: 12px;
+            font-size: 15px;
+            text-transform: uppercase;
+        }
+        .cuerpo { padding: 16px; }
+        label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+        input, select {
+            width: 100%;
+            padding: 9px;
+            margin-bottom: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .fila-campos { display: flex; gap: 12px; flex-wrap: wrap; }
+        .fila-campos > div { flex: 1; min-width: 150px; }
+        button {
+            background-color: var(--flix-green);
+            color: #000;
+            border: none;
+            padding: 10px 18px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover:not(:disabled) { background-color: #61b300; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-volver {
+            background-color: #555;
+            color: white;
+            text-decoration: none;
+            padding: 9px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            display: inline-block;
+        }
+        .btn-peligro {
+            background-color: #777;
+            color: white;
+            padding: 5px 9px;
+            font-size: 12px;
+        }
+        .btn-peligro:hover:not(:disabled) { background-color: var(--flix-red); }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #eee; font-size: 12px; text-transform: uppercase; }
+        .etiqueta-rol {
+            font-size: 11px;
+            font-weight: bold;
+            padding: 2px 7px;
+            border-radius: 10px;
+            background: #e0e0e0;
+        }
+        .etiqueta-rol.admin { background: var(--flix-orange); color: white; }
+        .mensaje {
+            display: none;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+        .mensaje.error { display: block; background: #ffe0e0; color: #a30000; border: 1px solid #ffb3b3; }
+        .mensaje.ok { display: block; background: #e2f0d9; color: #385723; border: 1px solid #b7d9a1; }
+        .barra-superior {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .ayuda { font-size: 12px; color: #666; margin: -6px 0 12px; }
+    </style>
+</head>
+<body>
+
+<div class="contenido">
+    <header>
+        <h1>ADMINISTRACIÓN DE USUARIOS</h1>
+    </header>
+
+    <div class="barra-superior">
+        <a href="/" class="btn-volver">← Volver al tablero</a>
+        <span id="quien-soy" style="font-size:14px"></span>
+    </div>
+
+    <div class="tarjeta">
+        <h2>Cambiar mi contraseña</h2>
+        <div class="cuerpo">
+            <div id="msg-clave" class="mensaje" role="alert"></div>
+            <form id="form-clave">
+                <div class="fila-campos">
+                    <div>
+                        <label for="clave-actual">Contraseña actual</label>
+                        <input type="password" id="clave-actual" autocomplete="current-password" required>
+                    </div>
+                    <div>
+                        <label for="clave-nueva">Contraseña nueva</label>
+                        <input type="password" id="clave-nueva" autocomplete="new-password" required>
+                    </div>
+                </div>
+                <p class="ayuda">Mínimo 10 caracteres.</p>
+                <button type="submit">Cambiar contraseña</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="seccion-admin" style="display:none">
+        <div class="tarjeta">
+            <h2>Crear usuario</h2>
+            <div class="cuerpo">
+                <div id="msg-crear" class="mensaje" role="alert"></div>
+                <form id="form-crear">
+                    <div class="fila-campos">
+                        <div>
+                            <label for="nuevo-usuario">Usuario</label>
+                            <input type="text" id="nuevo-usuario" autocapitalize="none" spellcheck="false" required>
+                        </div>
+                        <div>
+                            <label for="nuevo-nombre">Nombre para mostrar</label>
+                            <input type="text" id="nuevo-nombre">
+                        </div>
+                    </div>
+                    <div class="fila-campos">
+                        <div>
+                            <label for="nueva-clave">Contraseña</label>
+                            <input type="password" id="nueva-clave" autocomplete="new-password" required>
+                        </div>
+                        <div>
+                            <label for="nuevo-rol">Rol</label>
+                            <select id="nuevo-rol">
+                                <option value="operador">Operador</option>
+                                <option value="admin">Administrador</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p class="ayuda">Mínimo 10 caracteres. El usuario solo puede tener letras, números, punto o guion.</p>
+                    <button type="submit">Crear usuario</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="tarjeta">
+            <h2>Usuarios registrados</h2>
+            <div class="cuerpo">
+                <div id="msg-lista" class="mensaje" role="alert"></div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Nombre</th>
+                            <th>Rol</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-usuarios"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let sesionActual = null;
+
+    function mostrarMensaje(id, texto, tipo) {
+        const el = document.getElementById(id);
+        el.textContent = texto;
+        el.className = "mensaje " + tipo;
+    }
+
+    function limpiarMensaje(id) {
+        const el = document.getElementById(id);
+        el.textContent = "";
+        el.className = "mensaje";
+    }
+
+    function llamarApi(cuerpo) {
+        return fetch("/api/auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(cuerpo),
+        }).then(function (respuesta) {
+            return respuesta.json().then(function (datos) {
+                if (!respuesta.ok) throw new Error(datos.error || "Error inesperado");
+                return datos;
+            });
+        });
+    }
+
+    function cargarSesion() {
+        return fetch("/api/auth?accion=estado", { cache: "no-store" })
+            .then(function (r) { return r.json(); })
+            .then(function (estado) {
+                if (!estado.sesion) {
+                    window.location.replace("/login");
+                    return;
+                }
+                sesionActual = estado.sesion;
+                document.getElementById("quien-soy").textContent =
+                    "Conectado como " + sesionActual.usuario + (sesionActual.rol === "admin" ? " (administrador)" : "");
+                if (sesionActual.rol === "admin") {
+                    document.getElementById("seccion-admin").style.display = "block";
+                    cargarUsuarios();
+                }
+            });
+    }
+
+    function cargarUsuarios() {
+        fetch("/api/auth?accion=listar", { cache: "no-store" })
+            .then(function (r) { return r.json(); })
+            .then(function (usuarios) {
+                const tbody = document.getElementById("tbody-usuarios");
+                tbody.innerHTML = "";
+                usuarios.forEach(function (u) {
+                    const tr = document.createElement("tr");
+
+                    const tdUsuario = document.createElement("td");
+                    tdUsuario.textContent = u.usuario;
+
+                    const tdNombre = document.createElement("td");
+                    tdNombre.textContent = u.nombre || "—";
+
+                    const tdRol = document.createElement("td");
+                    const etiqueta = document.createElement("span");
+                    etiqueta.className = "etiqueta-rol" + (u.rol === "admin" ? " admin" : "");
+                    etiqueta.textContent = u.rol === "admin" ? "Administrador" : "Operador";
+                    tdRol.appendChild(etiqueta);
+
+                    const tdAcciones = document.createElement("td");
+
+                    const btnClave = document.createElement("button");
+                    btnClave.className = "btn-peligro";
+                    btnClave.textContent = "Nueva clave";
+                    btnClave.style.marginRight = "6px";
+                    btnClave.addEventListener("click", function () { resetearClave(u.usuario); });
+                    tdAcciones.appendChild(btnClave);
+
+                    if (u.usuario !== sesionActual.usuario) {
+                        const btnEliminar = document.createElement("button");
+                        btnEliminar.className = "btn-peligro";
+                        btnEliminar.textContent = "Eliminar";
+                        btnEliminar.addEventListener("click", function () { eliminarUsuario(u.usuario); });
+                        tdAcciones.appendChild(btnEliminar);
+                    }
+
+                    tr.append(tdUsuario, tdNombre, tdRol, tdAcciones);
+                    tbody.appendChild(tr);
+                });
+            })
+            .catch(function () { mostrarMensaje("msg-lista", "No se pudo cargar la lista de usuarios", "error"); });
+    }
+
+    function resetearClave(usuario) {
+        const nueva = window.prompt("Nueva contraseña para \"" + usuario + "\" (mínimo 10 caracteres):");
+        if (!nueva) return;
+        limpiarMensaje("msg-lista");
+        llamarApi({ accion: "resetear-clave", usuario: usuario, password: nueva })
+            .then(function () { mostrarMensaje("msg-lista", "Contraseña actualizada para " + usuario, "ok"); })
+            .catch(function (err) { mostrarMensaje("msg-lista", err.message, "error"); });
+    }
+
+    function eliminarUsuario(usuario) {
+        if (!window.confirm("¿Eliminar el usuario \"" + usuario + "\"? Perderá el acceso de inmediato.")) return;
+        limpiarMensaje("msg-lista");
+        llamarApi({ accion: "eliminar-usuario", usuario: usuario })
+            .then(function () {
+                mostrarMensaje("msg-lista", "Usuario " + usuario + " eliminado", "ok");
+                cargarUsuarios();
+            })
+            .catch(function (err) { mostrarMensaje("msg-lista", err.message, "error"); });
+    }
+
+    document.getElementById("form-clave").addEventListener("submit", function (evento) {
+        evento.preventDefault();
+        limpiarMensaje("msg-clave");
+        llamarApi({
+            accion: "cambiar-clave",
+            actual: document.getElementById("clave-actual").value,
+            nueva: document.getElementById("clave-nueva").value,
+        })
+            .then(function () {
+                mostrarMensaje("msg-clave", "Contraseña cambiada correctamente", "ok");
+                document.getElementById("form-clave").reset();
+            })
+            .catch(function (err) { mostrarMensaje("msg-clave", err.message, "error"); });
+    });
+
+    document.getElementById("form-crear").addEventListener("submit", function (evento) {
+        evento.preventDefault();
+        limpiarMensaje("msg-crear");
+        llamarApi({
+            accion: "crear-usuario",
+            usuario: document.getElementById("nuevo-usuario").value,
+            nombre: document.getElementById("nuevo-nombre").value,
+            password: document.getElementById("nueva-clave").value,
+            rol: document.getElementById("nuevo-rol").value,
+        })
+            .then(function () {
+                mostrarMensaje("msg-crear", "Usuario creado correctamente", "ok");
+                document.getElementById("form-crear").reset();
+                cargarUsuarios();
+            })
+            .catch(function (err) { mostrarMensaje("msg-crear", err.message, "error"); });
+    });
+
+    cargarSesion();
+</script>
+
+</body>
+</html>
