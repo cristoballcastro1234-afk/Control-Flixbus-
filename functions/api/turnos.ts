@@ -4,6 +4,11 @@ interface Env {
 
 const DESTINOS = new Set(["stgo", "cur", "scrz"]);
 const FECHA_PATTERN = /^\d{2}-\d{2}-\d{4}$/;
+const UN_DIA_MS = 86400000;
+
+// Cada tanto se aprovecha una lectura para purgar; el grueso de la limpieza ocurre
+// en el POST. Se mantiene bajo porque el GET se ejecuta miles de veces al día.
+const PROBABILIDAD_LIMPIEZA_EN_GET = 0.02;
 
 function json(data: unknown, status = 200) {
   return Response.json(data, {
@@ -12,9 +17,29 @@ function json(data: unknown, status = 200) {
   });
 }
 
+// La fecha la calcula el navegador (hora local de Chile), mientras que el servidor
+// corre en UTC. Se acepta un margen de 2 días para cubrir esa diferencia, pero se
+// rechaza cualquier fecha muy lejana: así un dispositivo con la hora mal configurada
+// no puede borrar los datos del día en curso.
+function fechaEsRazonable(fecha: string): boolean {
+  const [dia, mes, anio] = fecha.split("-").map(Number);
+  const marca = Date.UTC(anio, mes - 1, dia);
+  if (!Number.isFinite(marca)) return false;
+  return Math.abs(marca - Date.now()) <= 2 * UN_DIA_MS;
+}
+
+// Solo se conserva el día en curso: al escribir (o de vez en cuando al leer) se
+// eliminan los registros de cualquier otra fecha.
+async function purgarOtrosDias(env: Env, fecha: string): Promise<void> {
+  await env.DB.prepare("DELETE FROM turnos WHERE fecha <> ?").bind(fecha).run();
+}
+
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const fecha = new URL(context.request.url).searchParams.get("fecha") || "";
   if (!FECHA_PATTERN.test(fecha)) return json({ error: "Fecha inválida" }, 400);
+  if (!fechaEsRazonable(fecha)) {
+    return json({ error: "La fecha del dispositivo no coincide con la fecha real. Revisa la hora del equipo." }, 400);
+  }
 
   const { results } = await context.env.DB
     .prepare(
@@ -24,6 +49,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     )
     .bind(fecha)
     .all();
+
+  if (Math.random() < PROBABILIDAD_LIMPIEZA_EN_GET) {
+    await purgarOtrosDias(context.env, fecha);
+  }
 
   const registros = (results || []).map((r: any) => ({ ...r, cancelado: !!r.cancelado, eliminado: !!r.eliminado }));
   return json(registros);
@@ -52,6 +81,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return json({ error: "Datos de turno inválidos" }, 400);
   }
 
+  if (!fechaEsRazonable(fecha)) {
+    return json({ error: "La fecha del dispositivo no coincide con la fecha real. Revisa la hora del equipo." }, 400);
+  }
+
   const updatedAt = new Date().toISOString();
 
   await context.env.DB
@@ -69,6 +102,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     )
     .bind(fecha, destino, slotIndex, horaPlan, busNum, horaLlegada, horaReal, cancelado ? 1 : 0, eliminado ? 1 : 0, updatedAt)
     .run();
+
+  await purgarOtrosDias(context.env, fecha);
 
   return json({ fecha, destino, slotIndex, horaPlan, busNum, horaLlegada, horaReal, cancelado, eliminado, updatedAt });
 };
