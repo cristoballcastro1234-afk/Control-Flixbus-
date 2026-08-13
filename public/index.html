@@ -383,7 +383,11 @@
         },
     ];
     const DESTINOS = DESTINOS_CONFIG.map((d) => d.clave);
-    const REALTIME_INTERVAL_MS = 10000;
+    // Cada consulta lee los horarios del día completo, así que el intervalo es lo que
+    // más pesa en la cuota diaria del plan gratuito: bajarlo consume más. Con 12
+    // segundos y 5 dispositivos el uso queda cerca del 50% del límite de lecturas.
+    // No conviene bajar de aquí sin recalcular (a 7 segundos ya se llega al 83%).
+    const REALTIME_INTERVAL_MS = 12000;
     const UMBRAL_ATRASO_MIN = 5;
     const NOMBRES_DIA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
     const NOMBRES_MES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -398,6 +402,7 @@
     const db = {
         ref: function (ruta) {
             let intervalo = null;
+            let manejadorVisibilidad = null;
             let ultimaVersion = null;
             const partes = ruta.split("/").filter(Boolean);
             const fecha = partes[1] || "";
@@ -428,12 +433,42 @@
                             marcarSyncError();
                         });
                     };
-                    sincronizar();
-                    intervalo = setInterval(sincronizar, REALTIME_INTERVAL_MS);
+                    const arrancarSondeo = function () {
+                        if (intervalo) clearInterval(intervalo);
+                        intervalo = setInterval(sincronizar, REALTIME_INTERVAL_MS);
+                    };
+                    const detenerSondeo = function () {
+                        if (intervalo) clearInterval(intervalo);
+                        intervalo = null;
+                    };
+
+                    // Mientras la pestaña no esté a la vista se deja de consultar al
+                    // servidor: si una tablet queda con la página abierta después del
+                    // turno, no sigue gastando la cuota diaria toda la noche. Al volver
+                    // a ella se sincroniza de inmediato, sin esperar el intervalo.
+                    manejadorVisibilidad = function () {
+                        if (document.hidden) {
+                            detenerSondeo();
+                        } else {
+                            sincronizar();
+                            arrancarSondeo();
+                        }
+                    };
+                    document.addEventListener("visibilitychange", manejadorVisibilidad);
+
+                    if (!document.hidden) {
+                        sincronizar();
+                        arrancarSondeo();
+                    }
                 },
                 off: function (evento) {
-                    if (evento === "value" && intervalo) clearInterval(intervalo);
+                    if (evento !== "value") return;
+                    if (intervalo) clearInterval(intervalo);
                     intervalo = null;
+                    if (manejadorVisibilidad) {
+                        document.removeEventListener("visibilitychange", manejadorVisibilidad);
+                        manejadorVisibilidad = null;
+                    }
                 },
                 set: function (valor) {
                     if (!destino || slotIndex === undefined) {
