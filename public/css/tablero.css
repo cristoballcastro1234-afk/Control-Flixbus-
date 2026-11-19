@@ -256,3 +256,64 @@ dialog{border:1px solid #d4dfd3;border-radius:16px;padding:22px;width:min(94vw,4
  #tablero.desktop-columns .fila .campo input{font-size:15px}
  #tablero.desktop-columns .fila .campo label{font-size:11px}
 }
+
+/* Control 2.6 — celular: colores suaves, controles táctiles y menos distracciones.
+   Estilos exclusivamente móviles; mantener las funciones y datos actuales. */
+@media screen and (max-width:800px){
+ :root{--bg:#e1e8df;--paper:#eef2e9;--line:#c4d0c1;--ink:#25372a;--sub:#526657}
+ body{background:var(--bg);color:var(--ink)}
+ .top{background:#304c38;border-bottom-color:#83b949}
+ .workspace{background:#e9eee5;border-color:#bdcaba;box-shadow:0 3px 12px #223b2310;padding:10px}
+ .metrics article{background:#edf2e8;border-color:#c9d5c5}
+ .metrics strong{color:#335e32}
+ .metrics .metric-alert strong{color:#875510}
+ .filters .tabs{background:#d9e4d6;border-color:#c3d1bf}
+ .tabs button[aria-pressed=true]{background:#365840}
+ .filter-right input,.filter-right select{background:#f4f5ed;border-color:#bdcdbb}
+ .primary{background:#a7cb7c;border-color:#89aa64;color:#25421a}
+ .secondary{background:#eff3eb;border-color:#c2d0c0}
+ .mobile-history{background:#d6e1d4;border-color:#b6c7b4;gap:5px;padding:4px;margin-bottom:12px}
+ .mobile-history button{background:#edf2e8;color:#304b36;min-height:44px;font-size:13px}
+ .mobile-history button[aria-pressed=true]{background:#47694d;color:#fff}
+ #tablero .grupo{background:#d6e1d4;border:1px solid #b6c7b4;border-radius:12px;padding:6px}
+ #tablero .grupo-head{background:#47694d;color:#f8fbf5;padding:9px 10px;border-radius:7px;margin-bottom:7px;gap:5px}
+ #tablero .grupo-head h3{font-size:15px}
+ #tablero .grupo-count{color:#f0f5ec;font-size:11px}
+ #tablero .fila{background:#f0f3ea;border:1px solid #bacbb7;border-left:4px solid #99ae95;border-radius:9px;box-shadow:0 1px 3px #304e2910;padding:10px;gap:8px;margin-bottom:8px}
+ #tablero .fila:last-child{margin-bottom:0}
+ #tablero .fila[data-status=despachado]{background:#dcebd7;border-color:#b5cbb0;border-left-color:#64934f}
+ #tablero .fila[data-status=atrasado]{background:#f4e8ce;border-color:#d9c499;border-left-color:#b78232}
+ #tablero .fila[data-status=cancelado]{background:#efdfda;border-color:#d7b6ae;border-left-color:#b66a61}
+ #tablero .fila[data-status=eliminado]{background:#e3e7e0;border-color:#bfc9bb;border-left-color:#849181}
+ #tablero .fila.proxima{background:#dbe9f1;border-color:#a9c3d5;border-left-color:#397da7}
+ #tablero .fila .hora{font-size:25px;color:#243b29;line-height:1.15}
+ #tablero .destino-fila{font-size:16px;font-weight:750;color:#345039}
+ #tablero .fila .campo label{font-size:12px;color:#3d5542}
+ #tablero .fila .campo input{background:#f8f8ef;color:#253a2b;border-color:#a9bda7;font-size:16px;min-height:44px}
+ #tablero .fila .campo input::placeholder{color:#667969}
+ #tablero .fila .hora-campo .now{background:#c8ddbf;color:#284b2b;border-color:#a5bf9d;font-size:12px;min-height:44px;padding:5px}
+ #tablero .fila .ruta{background:#dce6d7;padding:6px;border-radius:6px}
+ #tablero .grupo[data-destino=todos] .fila[data-destino=stgo] .ruta{visibility:visible}
+ #tablero .fixed-route{font-size:14px;color:#345039}
+ #tablero .fixed-route.special{color:#79500c}
+ #tablero .tag{background:#dde4d8;color:#425442;font-size:12px}
+ #tablero .tag[data-status=despachado]{background:#c0dcb6;color:#2b5323}
+ #tablero .tag[data-status=atrasado]{background:#efd39e;color:#714b0f}
+ #tablero .tag[data-status=cancelado]{background:#e7bdb5;color:#822d26}
+ #tablero .fila.proxima .tag{background:#bcd8ea;color:#214d70}
+ #tablero .estado-detalle{color:#4f6250;font-size:12px}
+ #tablero .fila .actions{border-top:1px solid #b9cbb5;justify-content:flex-end;padding-top:6px}
+ #tablero .actions .note-action,#tablero .actions .remove,#tablero .note-line{display:none!important}
+ #tablero .actions .icon-button:not(.note-action):not(.remove){background:#e8e9df;color:#754740;border-color:#c9c2b7;min-height:44px;min-width:112px;padding:7px 12px;font-size:13px}
+ #tablero .fila[data-status=cancelado] .actions .icon-button{color:#365b35;background:#e2ebd9;border-color:#b9ccb1}
+ #tablero .restore{background:#e2ebd9;border-color:#b9ccb1;color:#365b35;min-height:44px}
+ #tablero .extra-label:empty,#tablero .saving-mark:empty,#tablero .estado-detalle:empty{display:none}
+ #dlgNota .observacion-cancelacion{display:none}
+ #dlgNota{background:#edf2e8}
+ #dlgNota select{background:#f8f8ef}
+}
+@media screen and (max-width:360px){
+ #tablero .fila{padding:8px;gap:6px}
+ #tablero .fila .hora-campo{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px}
+ #tablero .fila .hora-campo .now{padding:4px;font-size:11px}
+}
