@@ -106,3 +106,8 @@ dialog{border:1px solid #d4dfd3;border-radius:16px;padding:22px;width:min(94vw,4
  #tablero.desktop-columns .grupo:not([data-destino=stgo]) .fila .estado{grid-row:3}
  #tablero.desktop-columns .grupo:not([data-destino=stgo]) .fila .actions{grid-row:4}
 }
+
+/* Vista unificada: un único botón Todos, también en móvil. */
+#destinos{display:flex;flex-wrap:nowrap}
+#destinos button{min-width:100px}
+@media screen and (max-width:800px){#destinos button{width:100%}}

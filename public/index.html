@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#17251c">
 <title>Control de buses | FlixBus</title>
-<link rel="stylesheet" href="/css/tablero.css?v=2.3">
+<link rel="stylesheet" href="/css/tablero.css?v=2.3.1">
 <script src="/js/tablero.js?v=2.3" defer></script>
 </head>
 <body>
@@ -31,7 +31,7 @@
  <section class="workspace">
   <div class="section-heading"><div><h2>Tablero del día</h2><p>Registra llegada y salida; los cambios se guardan automáticamente.</p></div><span id="reloj" class="clock"></span></div>
   <div class="filters no-print">
-   <div class="tabs" id="destinos" role="group" aria-label="Destino"><button data-destino="" aria-pressed="true">Todos</button><button data-destino="stgo">Santiago</button><button data-destino="cur">Curicó</button><button data-destino="scrz">Santa Cruz</button></div>
+   <div class="tabs" id="destinos" role="group" aria-label="Destino"><button data-destino="" aria-pressed="true">Todos</button></div>
    <div class="filter-right"><label><span class="sr-only">Buscar horario o bus</span><input id="buscar" type="search" placeholder="Buscar horario o N° de bus"></label><label><span class="sr-only">Filtrar estado</span><select id="filtro"><option value="">Todos los estados</option><option value="pendiente">Pendientes</option><option value="atrasado">Atrasados activos</option><option value="despachado">Despachados</option><option value="cancelado">Cancelados</option><option value="eliminado">Eliminados de hoy</option></select></label><button id="extra" class="primary">+ Bus extra</button></div>
   </div>
   <div class="mobile-history no-print" id="mobileHistory" role="group" aria-label="Servicios del día">
