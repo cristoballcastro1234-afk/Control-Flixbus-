@@ -28,7 +28,7 @@ export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,
   return json({fecha:dia.fecha,actividad:r.results});
  }
  const meta={...dia,now:Date.now(),usuario:data.sesion.usuario,rol:data.sesion.rol};
- if(estado.limpieza===dia.fecha && params.get("fecha")===dia.fecha && params.get("version")==="2.1.1" && params.get("revision")===String(estado.revision)){
+ if(estado.limpieza===dia.fecha && params.get("fecha")===dia.fecha && params.get("revision")===String(estado.revision)){
   return json({...meta,revision:estado.revision,sinCambios:true});
  }
  // La revisión y las filas se leen en una misma transacción D1, para no
