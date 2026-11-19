@@ -13,7 +13,7 @@ let revision=null,fecha="",grupo="",rol="",offset=0,loaded=false,serverRows=new 
 const nodes=new Map(),sections=new Map();
 const mobile=matchMedia("(max-width:800px)");let anteriores=false;
 function completo(r){return !!String(r.busNum||"").trim()&&minutes(r.horaLlegada)!==null&&minutes(r.horaReal)!==null;}
-function guardadoCompleto(r){return !r.eliminado&&completo(r)&&!jobs.some(j=>j.fecha===fecha&&j.destino===r.destino&&j.slotIndex===r.slotIndex);}
+function guardadoCompleto(r){const confirmado=serverRows.get(key(r));return !r.eliminado&&!!confirmado&&completo(confirmado);}
 function historialVisible(r){return !mobile.matches||filter==="eliminado"||guardadoCompleto(r)===anteriores;}
 function setHistorial(valor){anteriores=valor;filter="";$("filtro").value="";search="";$("buscar").value="";render();}
 function official(){return new Date(Date.now()+offset)}
