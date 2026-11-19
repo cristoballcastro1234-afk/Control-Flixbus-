@@ -36,3 +36,12 @@ dialog{border:1px solid #d4dfd3;border-radius:16px;padding:22px;width:min(94vw,4
  .restore{min-height:30px}.extra-label,.saving-mark{font-size:10px;margin-top:1px}.note-line{font-size:12px;margin:0;padding-bottom:2px}
 }
 @media print{.fixed-route{display:none!important}}
+
+/* Vista móvil cronológica: una sola lista con todos los destinos. */
+.destino-fila{display:none}
+@media screen and (max-width:800px){
+ .grupo[data-destino=todos] .destino-fila{display:block;font-size:15px;font-weight:750;line-height:1.3;margin-top:2px;color:#34523b}
+ .grupo[data-destino=todos] .fila[data-destino=stgo] .ruta{display:block}
+ .grupo[data-destino=todos] .fila:not([data-destino=stgo]) .ruta{display:none}
+}
+@media print{.grupo[data-destino=todos]{display:none!important}}

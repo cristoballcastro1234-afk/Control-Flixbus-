@@ -70,3 +70,19 @@ test("Móvil: solo mueve salidas completas confirmadas; PC muestra todo",()=>{
  `,ctx);
  assert.equal(checks.a,false);assert.equal(checks.b,true);assert.equal(checks.c,true);assert.equal(checks.d,false);assert.equal(checks.e,true);assert.equal(checks.f,false);assert.equal(checks.g,true);assert.equal(checks.h,true);
 });
+
+test("Todos en móvil ordena las salidas de distintos destinos por hora",()=>{
+ const fragment=js.slice(0,js.indexOf('$("formNota").addEventListener'));
+ const ctx=vm.createContext({Intl,Date,Map,Set,console,matchMedia:()=>({matches:true})});
+ const checks=vm.runInContext(fragment+`
+ const r=[{destino:"stgo",horaPlan:"13:20",slotIndex:19},{destino:"cur",horaPlan:"12:35",slotIndex:10},{destino:"scrz",horaPlan:"15:49",slotIndex:6},{destino:"stgo",horaPlan:"9:35",slotIndex:11}];
+ const sorted=ordenarServicios(r);
+ const all=filasDelGrupo(sorted,"todos").map(x=>x.horaPlan).join(",");
+ const cur=filasDelGrupo(sorted,"cur").map(x=>x.horaPlan).join(",");
+ const mobileAll=cronologicoMovil();selected="cur";const mobileSelected=cronologicoMovil();
+ selected="";printing=true;const printAll=cronologicoMovil();printing=false;mobile.matches=false;const pc=cronologicoMovil();
+ ({all,cur,mobileAll,mobileSelected,printAll,pc})
+ `,ctx);
+ assert.equal(checks.all,"9:35,12:35,13:20,15:49");assert.equal(checks.cur,"12:35");
+ assert.equal(checks.mobileAll,true);assert.equal(checks.mobileSelected,false);assert.equal(checks.printAll,false);assert.equal(checks.pc,false);
+});
