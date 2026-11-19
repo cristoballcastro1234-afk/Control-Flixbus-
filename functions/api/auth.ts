@@ -6,6 +6,7 @@ interface Env {
 export interface Sesion {
   usuario: string;
   rol: string;
+  cuenta: string;
 }
 
 // Cloudflare limita PBKDF2 a 100.000 iteraciones y el plan gratuito da 10ms de CPU
@@ -87,7 +88,7 @@ function claveHmac(secreto: string) {
 }
 
 export async function crearToken(secreto: string, sesion: Sesion): Promise<string> {
-  const payload = { u: sesion.usuario, r: sesion.rol, exp: Math.floor(Date.now() / 1000) + DURACION_SESION_SEG };
+  const payload = { u: sesion.usuario, r: sesion.rol, c: sesion.cuenta, exp: Math.floor(Date.now() / 1000) + DURACION_SESION_SEG };
   const cuerpo = aBase64Url(enc.encode(JSON.stringify(payload)));
   const firma = await crypto.subtle.sign("HMAC", await claveHmac(secreto), enc.encode(cuerpo));
   return cuerpo + "." + aBase64Url(new Uint8Array(firma));
@@ -105,8 +106,8 @@ export async function verificarToken(secreto: string, token: string): Promise<Se
   try {
     const payload = JSON.parse(new TextDecoder().decode(desdeBase64Url(cuerpo)));
     if (typeof payload.exp !== "number" || payload.exp * 1000 <= Date.now()) return null;
-    if (typeof payload.u !== "string" || typeof payload.r !== "string") return null;
-    return { usuario: payload.u, rol: payload.r };
+    if (typeof payload.u !== "string" || typeof payload.r !== "string" || typeof payload.c !== "string") return null;
+    return { usuario: payload.u, rol: payload.r, cuenta: payload.c };
   } catch {
     return null;
   }
@@ -178,9 +179,13 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
   const secreto = context.env.SESSION_SECRET || "";
   if (!secreto) return json({ error: "Falta configurar SESSION_SECRET en Cloudflare" }, 500);
 
+  const origen = context.request.headers.get("Origin");
+  if (origen && origen !== new URL(context.request.url).origin) return json({error:"Petición no permitida"},403);
+  if (!(context.request.headers.get("Content-Type")||"").startsWith("application/json")) return json({error:"Petición inválida"},400);
   let payload: Record<string, unknown>;
   try {
     payload = await context.request.json<Record<string, unknown>>();
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return json({error:"Petición inválida"},400);
   } catch {
     return json({ error: "Petición inválida" }, 400);
   }
@@ -201,15 +206,16 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
     const errorPassword = validarPassword(password);
     if (errorPassword) return json({ error: errorPassword }, 400);
 
+    const creadoEn = new Date().toISOString();
     await context.env.DB
       .prepare(
         `INSERT INTO usuarios (usuario, nombre, password_hash, rol, activo, creado_en)
          VALUES (?, ?, ?, 'admin', 1, ?)`,
       )
-      .bind(usuario, String(payload.nombre || usuario).slice(0, 60), await hashPassword(password), new Date().toISOString())
+      .bind(usuario, String(payload.nombre || usuario).slice(0, 60), await hashPassword(password), creadoEn)
       .run();
 
-    const token = await crearToken(secreto, { usuario, rol: "admin" });
+    const token = await crearToken(secreto, { usuario, rol: "admin", cuenta: creadoEn+":0" });
     return json({ ok: true, sesion: { usuario, rol: "admin" } }, 200, {
       "Set-Cookie": cookieSesion(token, DURACION_SESION_SEG),
     });
@@ -219,9 +225,10 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
   if (accion === "login") {
     const usuario = normalizarUsuario(payload.usuario);
     const password = String(payload.password || "");
+    if (password.length > 200 || !USUARIO_PATTERN.test(usuario)) return json({error:"Usuario o contraseña incorrectos"},401);
 
     const fila = await context.env.DB
-      .prepare("SELECT usuario, nombre, password_hash as passwordHash, rol, activo, intentos_fallidos as intentos, bloqueado_hasta as bloqueadoHasta FROM usuarios WHERE usuario = ?")
+      .prepare("SELECT usuario, nombre, password_hash as passwordHash, rol, activo, creado_en as creadoEn, sesion_version as sessionVersion, intentos_fallidos as intentos, bloqueado_hasta as bloqueadoHasta FROM usuarios WHERE usuario = ?")
       .bind(usuario)
       .first<any>();
 
@@ -256,7 +263,7 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
         .run();
     }
 
-    const token = await crearToken(secreto, { usuario: fila.usuario, rol: fila.rol });
+    const token = await crearToken(secreto, { usuario: fila.usuario, rol: fila.rol, cuenta: fila.creadoEn+":"+fila.sessionVersion });
     return json({ ok: true, sesion: { usuario: fila.usuario, rol: fila.rol, nombre: fila.nombre } }, 200, {
       "Set-Cookie": cookieSesion(token, DURACION_SESION_SEG),
     });
@@ -335,20 +342,32 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
     return json({ ok: true });
   }
 
+  if (accion === "estado-usuario") {
+    const usuario = normalizarUsuario(payload.usuario);
+    if (usuario === sesion.usuario || typeof payload.activo !== "boolean") return json({error:"Acción inválida"},400);
+    // Incrementar la versión al desactivar invalida tokens anteriores a una reactivación.
+    const r = payload.activo
+      ? await context.env.DB.prepare("UPDATE usuarios SET activo=1 WHERE usuario=? AND activo=0").bind(usuario).run()
+      : await context.env.DB.prepare("UPDATE usuarios SET activo=0, sesion_version=sesion_version+1 WHERE usuario=? AND activo=1 AND (rol<>'admin' OR (SELECT COUNT(*) FROM usuarios WHERE rol='admin' AND activo=1)>1)").bind(usuario).run();
+    if (!r.meta.changes) return json({error:"Usuario no encontrado, sin cambios o último administrador"},400);
+    return json({ok:true});
+  }
+
   if (accion === "eliminar-usuario") {
     const usuario = normalizarUsuario(payload.usuario);
     if (usuario === sesion.usuario) return json({ error: "No puedes eliminar tu propio usuario" }, 400);
 
     const fila = await context.env.DB
-      .prepare("SELECT rol FROM usuarios WHERE usuario = ?")
+      .prepare("SELECT rol, activo FROM usuarios WHERE usuario = ?")
       .bind(usuario)
       .first<any>();
     if (!fila) return json({ error: "Ese usuario no existe" }, 404);
-    if (fila.rol === "admin" && (await contarAdmins(context.env)) <= 1) {
+    if (fila.rol === "admin" && fila.activo && (await contarAdmins(context.env)) <= 1) {
       return json({ error: "Debe quedar al menos un administrador" }, 400);
     }
 
-    await context.env.DB.prepare("DELETE FROM usuarios WHERE usuario = ?").bind(usuario).run();
+    const r = await context.env.DB.prepare("DELETE FROM usuarios WHERE usuario=? AND (rol<>\'admin\' OR activo=0 OR (SELECT COUNT(*) FROM usuarios WHERE rol=\'admin\' AND activo=1)>1)").bind(usuario).run();
+    if (!r.meta.changes) return json({error:"Debe quedar al menos un administrador activo"},400);
     return json({ ok: true });
   }
 

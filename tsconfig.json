@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "esModuleInterop": true
   },
-  "include": ["functions/**/*.ts", "schema.ts"]
+  "include": ["functions/**/*.ts", "worker/**/*.ts", "schema.ts"]
 }

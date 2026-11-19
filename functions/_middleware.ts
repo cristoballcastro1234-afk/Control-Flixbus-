@@ -20,6 +20,13 @@ export const onRequest: PagesFunction<Env, string, { sesion: Sesion | null }> = 
   // aunque la ruta sea pública.
   context.data.sesion = secreto ? await verificarToken(secreto, leerCookieSesion(context.request)) : null;
 
+  // Consulta la cuenta en cada solicitud: desactivar o eliminar revoca la sesión.
+  // Cambiar la contraseña no altera el identificador de la cuenta.
+  if (context.data.sesion) {
+    const s=context.data.sesion;
+    const cuenta=await context.env.DB.prepare("SELECT rol,activo,creado_en AS creadoEn,sesion_version AS sessionVersion FROM usuarios WHERE usuario=?").bind(s.usuario).first<{rol:string;activo:number;creadoEn:string;sessionVersion:number}>();
+    context.data.sesion=cuenta?.activo && cuenta.creadoEn+":"+cuenta.sessionVersion===s.cuenta ? {...s,rol:cuenta.rol} : null;
+  }
   if (RUTAS_PUBLICAS.has(ruta) || ruta === "/api/auth") {
     return context.next();
   }

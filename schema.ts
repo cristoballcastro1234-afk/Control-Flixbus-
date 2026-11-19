@@ -16,6 +16,11 @@ export const turnos = sqliteTable(
     // Oculta el horario de la vista de hoy (se usa cuando el horario no va a circular),
     // a diferencia de "cancelado" que es para un bus que sí estaba en curso (ej: panne).
     eliminado: integer("eliminado", { mode: "boolean" }).notNull().default(false),
+    tipo: text("tipo"),
+    terminal: text("terminal"),
+    motivo: text("motivo").notNull().default(""),
+    observacion: text("observacion").notNull().default(""),
+    updatedBy: text("updated_by").notNull().default(""),
     updatedAt: text("updated_at").notNull(),
   },
   (table) => [
@@ -33,4 +38,12 @@ export const usuarios = sqliteTable("usuarios", {
   intentosFallidos: integer("intentos_fallidos").notNull().default(0),
   bloqueadoHasta: text("bloqueado_hasta").notNull().default(""),
   creadoEn: text("creado_en").notNull(),
+  sessionVersion: integer("sesion_version").notNull().default(0),
+});
+
+export const horarios = sqliteTable("horarios",{
+ destino:text("destino").notNull(),slotIndex:integer("slot_index").notNull(),grupo:text("grupo").notNull(),horaPlan:text("hora_plan").notNull(),tipo:text("tipo").notNull().default(""),terminal:text("terminal").notNull().default("")
+},t=>[primaryKey({columns:[t.destino,t.slotIndex]})]);
+export const actividadDia = sqliteTable("actividad_dia",{
+ id:integer("id").primaryKey({autoIncrement:true}),fecha:text("fecha").notNull(),destino:text("destino").notNull(),slotIndex:integer("slot_index").notNull(),usuario:text("usuario").notNull(),momento:text("momento").notNull(),anterior:text("anterior"),nuevo:text("nuevo").notNull()
 });
