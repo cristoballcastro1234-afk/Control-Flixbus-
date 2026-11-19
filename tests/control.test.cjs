@@ -27,3 +27,18 @@ test("Migraciones SQLite, semilla de 86 horarios y auditoría diaria",()=>{
  assert.equal(db.prepare("SELECT COUNT(*) n FROM turnos").get().n,1);assert.equal(db.prepare("SELECT COUNT(*) n FROM actividad_dia").get().n,2);
  }finally{db.close()}
 });
+
+test("Revisión ligera: lectura sin cambios y cambios atómicos de turnos y horarios",()=>{
+ const db=new DatabaseSync(":memory:");
+ try{
+ for(const f of fs.readdirSync("migrations").filter(x=>x.endsWith(".sql")).sort())db.exec(fs.readFileSync("migrations/"+f,"utf8"));
+ const rev=()=>db.prepare("SELECT revision FROM sync_estado WHERE id=1").get().revision;
+ const initial=rev();assert.equal(rev(),initial);
+ db.prepare("INSERT INTO turnos(fecha,destino,slot_index,hora_plan,updated_at,updated_by) VALUES('22-11-2026','stgo',0,'05:35','2026-11-22T12:00:00Z','operador')").run();
+ assert.equal(rev(),initial+1);
+ db.prepare("UPDATE turnos SET bus_num='123'").run();assert.equal(rev(),initial+2);
+ db.prepare("UPDATE horarios SET tipo='directo' WHERE destino='stgo' AND slot_index=0").run();assert.equal(rev(),initial+3);
+ db.prepare("DELETE FROM turnos WHERE fecha='22-11-2026'").run();assert.equal(rev(),initial+4);
+ db.prepare("UPDATE sync_estado SET limpieza='22-11-2026' WHERE id=1").run();assert.equal(rev(),initial+4);
+ }finally{db.close()}
+});

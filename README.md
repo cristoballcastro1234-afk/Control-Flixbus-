@@ -1,5 +1,10 @@
 # Control FlixBus 2.0 — rama de preparación
 Aplicación Cloudflare Pages + D1. La versión de producción no está modificada.
+## Sincronización y cuotas gratuitas
+- Se conserva el intervalo de 12 segundos en cada pestaña visible. Cada GET sin cambios lee únicamente la cuenta y una fila de revisión, además de los costes de índices. El tablero completo se recupera si cambia la revisión, la fecha o tras un guardado propio. No hay caché persistente de datos de buses.
+- Aplicar también `migrations/0006_sync_ligera.sql` después de 0005, tanto en prueba como en producción. La migración 0006 es repetible y no elimina registros. Los triggers incrementan la revisión dentro de la misma operación que modifica horarios o turnos.
+- El primer GET de cada día ejecuta la limpieza de respaldo. El Cron independiente sigue siendo imprescindible si no hay usuarios conectados. 
+- Medir las cuotas de toda la cuenta tras el despliegue; 6 pestañas durante 16 h 10 min a 12 s implican aproximadamente 29.100 GET/día antes de otros accesos.
 ## Cambios
 - Configuración permanente de horarios por destino y grupo (lunes a sábado / domingo). Se migran los 86 horarios existentes a lunes–sábado; **domingo queda sin horarios hasta que el administrador los configure**. Los tipos directo/indirecto (entrada al terminal de Rancagua) y terminal Sur/San Borja son opcionales para Santiago, tanto en el horario como en el registro del día.
 - Registro de bus, hora planificada, llegada, salida, cancelación con motivo opcional, observaciones, quitar/restaurar servicio del día, buses extra. Botones Ahora con hora de Chile ajustada con el servidor.

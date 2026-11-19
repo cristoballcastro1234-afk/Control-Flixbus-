@@ -13,24 +13,43 @@ function vista(t:Turno,h?:Horario) {return {...t, horaPlan:t.horaPlan.padStart(5
 export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,request}) => {
  if(!data.sesion)return json({error:"No autenticado"},401);
  const dia=diaChile();
- // Respaldo de limpieza si el Cron todavía no ha ejecutado el cambio de día.
- await limpiarDias(env.DB);
- if(new URL(request.url).searchParams.get("accion")==="actividad"){
+ const params=new URL(request.url).searchParams;
+ const estado=await env.DB.prepare("SELECT revision,limpieza FROM sync_estado WHERE id=1").first<{revision:number;limpieza:string}>();
+ if(!estado)return json({error:"Falta configurar la sincronización"},503);
+ // Solo el primer acceso de cada día ejecuta la limpieza de respaldo.
+ // El Cron independiente permanece activo aun sin visitantes.
+ if(estado.limpieza!==dia.fecha){
+  await limpiarDias(env.DB);
+  if(diaChile().fecha!==dia.fecha)return json({error:"Cambió el día operativo. Reintenta."},409);
+  await env.DB.prepare("UPDATE sync_estado SET limpieza=? WHERE id=1 AND limpieza<>?").bind(dia.fecha,dia.fecha).run();
+ }
+ if(params.get("accion")==="actividad"){
   const r=await env.DB.prepare("SELECT id,destino,slot_index AS slotIndex,usuario,momento,anterior,nuevo FROM actividad_dia WHERE fecha=? ORDER BY id DESC LIMIT 250").bind(dia.fecha).all();
   return json({fecha:dia.fecha,actividad:r.results});
  }
- const [h,t]=await Promise.all([
- env.DB.prepare(horarios+" WHERE grupo=? ORDER BY hora_plan").bind(dia.grupo).all<Horario>(),
- env.DB.prepare(seleccionar+" WHERE fecha=?").bind(dia.fecha).all<Turno>()
+ const meta={...dia,now:Date.now(),usuario:data.sesion.usuario,rol:data.sesion.rol};
+ if(estado.limpieza===dia.fecha && params.get("fecha")===dia.fecha && params.get("revision")===String(estado.revision)){
+  return json({...meta,revision:estado.revision,sinCambios:true});
+ }
+ // La revisión y las filas se leen en una misma transacción D1, para no
+ // marcar como recibido un cambio que no está incluido en la respuesta.
+ const [rev,h,t]=await env.DB.batch([
+ env.DB.prepare("SELECT revision FROM sync_estado WHERE id=1"),
+ env.DB.prepare(horarios+" WHERE grupo=? ORDER BY hora_plan").bind(dia.grupo),
+ env.DB.prepare(seleccionar+" WHERE fecha=?").bind(dia.fecha)
  ]);
- const porId=new Map(t.results.map(r=>[r.destino+":"+r.slotIndex,r]));
- const rows=h.results.map(r=>{
+ if(diaChile().fecha!==dia.fecha)return json({error:"Cambió el día operativo. Reintenta."},409);
+ const revision=Number(rev.results[0]?.revision);
+ if(!Number.isSafeInteger(revision))return json({error:"Revisión inválida"},503);
+ const hs=h.results as Horario[], ts=t.results as Turno[];
+ const porId=new Map(ts.map(r=>[r.destino+":"+r.slotIndex,r]));
+ const rows=hs.map(r=>{
   const k=r.destino+":"+r.slotIndex;
   const real=porId.get(k); porId.delete(k);
   return vista(real||{...r,busNum:"",horaLlegada:"",horaReal:"",cancelado:false,eliminado:false,motivo:"",observacion:"",updatedAt:"",updatedBy:""},r);
  });
  for(const r of porId.values())rows.push(vista(r));
- return json({...dia,now:Date.now(),usuario:data.sesion.usuario,rol:data.sesion.rol,programados:h.results.length,rows});
+ return json({...meta,now:Date.now(),revision,programados:hs.length,rows});
 };
 function validar(k:Campo,v:unknown,destino:string) {
  if(k==="cancelado"||k==="eliminado")return typeof v==="boolean";
@@ -48,7 +67,7 @@ export const onRequestPost:PagesFunction<Env,string,Contexto> = async ({env,data
  const dia=diaChile(); const destino=String(p.destino||"");
  if(p.fecha!==dia.fecha)return json({error:"Cambió el día operativo. Actualiza el tablero."},409);
  if(!destinos.has(destino))return json({error:"Destino inválido"},400);
- await limpiarDias(env.DB);
+ // El Worker programado y el primer GET del día ya se ocupan de la limpieza.
  const quien=data.sesion.usuario;
  const ahora=new Date().toISOString();
  if(p.accion==="agregar"){
