@@ -33,13 +33,13 @@ export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,
  }
  // La revisión y las filas se leen en una misma transacción D1, para no
  // marcar como recibido un cambio que no está incluido en la respuesta.
- const [rev,h,t]=await env.DB.batch([
+ const [rev,h,t]=await env.DB.batch<{revision:number}|Horario|Turno>([
  env.DB.prepare("SELECT revision FROM sync_estado WHERE id=1"),
  env.DB.prepare(horarios+" WHERE grupo=? ORDER BY hora_plan").bind(dia.grupo),
  env.DB.prepare(seleccionar+" WHERE fecha=?").bind(dia.fecha)
  ]);
  if(diaChile().fecha!==dia.fecha)return json({error:"Cambió el día operativo. Reintenta."},409);
- const revision=Number(rev.results[0]?.revision);
+ const revision=Number((rev.results[0] as {revision:number}|undefined)?.revision);
  if(!Number.isSafeInteger(revision))return json({error:"Revisión inválida"},503);
  const hs=h.results as Horario[], ts=t.results as Turno[];
  const porId=new Map(ts.map(r=>[r.destino+":"+r.slotIndex,r]));
