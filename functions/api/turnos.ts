@@ -28,7 +28,7 @@ export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,
   return json({fecha:dia.fecha,actividad:r.results});
  }
  const meta={...dia,now:Date.now(),usuario:data.sesion.usuario,rol:data.sesion.rol};
- if(estado.limpieza===dia.fecha && params.get("fecha")===dia.fecha && params.get("revision")===String(estado.revision)){
+ if(estado.limpieza===dia.fecha && params.get("fecha")===dia.fecha && params.get("version")==="2.1.1" && params.get("revision")===String(estado.revision)){
   return json({...meta,revision:estado.revision,sinCambios:true});
  }
  // La revisión y las filas se leen en una misma transacción D1, para no
@@ -48,7 +48,18 @@ export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,
   const real=porId.get(k); porId.delete(k);
   return vista(real||{...r,busNum:"",horaLlegada:"",horaReal:"",cancelado:false,eliminado:false,motivo:"",observacion:"",updatedAt:"",updatedBy:""},r);
  });
- for(const r of porId.values())rows.push(vista(r));
+ // Los registros diarios heredados pueden tener un ID distinto al del horario.
+ // Si existe una coincidencia inequívoca por destino y hora, usar sus metadatos
+ // pero conservar el ID del registro (y su condición de extra) para no perder datos.
+ const porHora=new Map<string,Horario|null>();
+ for(const h of hs){
+  const k=h.destino+":"+h.horaPlan.padStart(5,"0");
+  porHora.set(k,porHora.has(k)?null:h);
+ }
+ for(const r of porId.values()){
+  const h=porHora.get(r.destino+":"+r.horaPlan.padStart(5,"0"));
+  rows.push({...vista(r,h??undefined),manual:true});
+ }
  return json({...meta,now:Date.now(),revision,programados:hs.length,rows});
 };
 function validar(k:Campo,v:unknown) {
