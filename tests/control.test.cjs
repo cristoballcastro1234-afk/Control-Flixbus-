@@ -86,3 +86,16 @@ test("Todos en móvil ordena las salidas de distintos destinos por hora",()=>{
  assert.equal(checks.all,"9:35,12:35,13:20,15:49");assert.equal(checks.cur,"12:35");
  assert.equal(checks.mobileAll,true);assert.equal(checks.mobileSelected,false);assert.equal(checks.printAll,false);assert.equal(checks.pc,false);
 });
+
+test("Guía PC: resumen y registros pendientes sin ocultar despachos",()=>{
+ const fragment=js.slice(0,js.indexOf('$("formNota").addEventListener'));
+ const ctx=vm.createContext({Intl,Date,Map,Set,console,matchMedia:()=>({matches:false})});
+ const result=vm.runInContext(fragment+`
+ const r={destino:"stgo",slotIndex:1,busNum:"123",horaLlegada:"08:00",horaReal:"08:05"};
+ const rows=[r,{...r,horaReal:""},{...r,cancelado:true,horaReal:""},{...r,eliminado:true},{...r,busNum:""}];
+ ({summary:resumenDestino(rows),pending:rows.map(pendienteRegistro),allVisible:rows.slice(0,3).every(historialVisible),pc:columnasPC()})
+ `,ctx);
+ assert.equal(JSON.stringify(result.summary),JSON.stringify({total:4,sinSalida:1,despachados:2,cancelados:1}));
+ assert.equal(JSON.stringify(result.pending),JSON.stringify([false,true,false,false,true]));
+ assert.equal(result.allVisible,true);assert.equal(result.pc,true);
+});

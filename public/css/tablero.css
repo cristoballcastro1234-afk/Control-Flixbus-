@@ -111,3 +111,77 @@ dialog{border:1px solid #d4dfd3;border-radius:16px;padding:22px;width:min(94vw,4
 #destinos{display:flex;flex-wrap:nowrap}
 #destinos button{min-width:100px}
 @media screen and (max-width:800px){#destinos button{width:100%}}
+
+/* Control 2.4: tarjetas guiadas para oficina, sin cambios en móvil ni impresión. */
+.desktop-aid{display:none}
+@media screen and (min-width:801px){
+ #tablero.desktop-columns{grid-template-columns:minmax(0,1.12fr) minmax(0,1fr) minmax(0,1fr);gap:12px}
+ #tablero.desktop-columns>.grupo{background:#f0f4ef;border:1px solid #d3dfd1;border-radius:12px;height:clamp(300px,calc(100dvh - 190px),1000px)}
+ #tablero.desktop-columns .grupo-head{background:#203b28;color:#fff;padding:10px 12px;gap:6px}
+ #tablero.desktop-columns .grupo-head h3{font-size:20px;letter-spacing:-.3px}
+ #tablero.desktop-columns .grupo-count{color:#e0ebdf;font-size:11px}
+ #tablero.desktop-columns .panel-guia{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;padding:8px;background:#fff;flex-shrink:0;border-bottom:1px solid #dce6db}
+ #tablero.desktop-columns .resumen-destino{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font-size:12px;font-weight:700}
+ #tablero.desktop-columns .resumen-pendientes{color:#465c4a}
+ #tablero.desktop-columns .resumen-despachados{color:#316722}
+ #tablero.desktop-columns .resumen-cancelados{color:#9b2c2c}
+ #tablero.desktop-columns .ir-pendiente{display:inline-flex;align-items:center;justify-content:center;background:#e6f0fb;color:#234f80;border:1px solid #bbd2ea;font-size:12px;padding:5px 9px;min-height:28px;border-radius:7px}
+ #tablero.desktop-columns .columnas{display:none}
+ #tablero.desktop-columns .rows{padding:7px 6px;scrollbar-width:auto;scrollbar-color:#839a7e #e4ebe1}
+ #tablero.desktop-columns .fila{grid-template-columns:minmax(60px,.8fr) minmax(70px,1fr) minmax(0,1fr) minmax(0,1fr);gap:6px 7px;padding:8px;min-width:0;min-height:0;align-items:center;margin:0 0 7px;border:1px solid #d5e0d3;border-left:4px solid #bdcabc;border-radius:8px;background:#fff;box-shadow:0 1px 2px #1f37200a}
+ #tablero.desktop-columns .fila:last-child{margin-bottom:0;border-bottom:1px solid #d5e0d3}
+ #tablero.desktop-columns .fila .hora-col{grid-column:1;grid-row:1;align-self:center}
+ #tablero.desktop-columns .hora-caption{display:block;color:#536653;font-size:11px;font-weight:700}
+ #tablero.desktop-columns .fila .hora{font-size:21px;line-height:1.12;letter-spacing:-.25px}
+ #tablero.desktop-columns .fila .campo-busNum{grid-column:2;grid-row:1}
+ #tablero.desktop-columns .fila .estado{grid-column:3/5;grid-row:1;display:flex;align-items:flex-end;justify-content:flex-end;flex-direction:column;gap:3px;text-align:right}
+ #tablero.desktop-columns .fila .campo-horaLlegada{grid-column:1/3;grid-row:2}
+ #tablero.desktop-columns .fila .campo-horaReal{grid-column:3/5;grid-row:2}
+ #tablero.desktop-columns .fila .campo-tipo{grid-column:1/3;grid-row:3}
+ #tablero.desktop-columns .fila .campo-terminal{grid-column:3/5;grid-row:3}
+ #tablero.desktop-columns .fila .campo label{display:block;font-size:11px;font-weight:700;margin:0 0 3px;color:#455b49;line-height:1.2}
+ #tablero.desktop-columns .fila .campo input{font-size:15px;font-weight:600;min-height:32px;padding:4px 5px;background:#fff;border-color:#b9caba}
+ #tablero.desktop-columns .hora-campo{display:flex;align-items:stretch;gap:4px}
+ #tablero.desktop-columns .hora-campo input{flex:1;min-width:0;width:0;font-variant-numeric:tabular-nums}
+ #tablero.desktop-columns .now{font-size:12px;min-height:32px;padding:3px 5px;color:#234c28;background:#e8f1e4;border-color:#bfd2bb;font-weight:750}
+ #tablero.desktop-columns .fila .ruta{padding:4px 6px;background:#edf2e9;border-radius:5px}
+ #tablero.desktop-columns .fixed-route{font-size:12px;line-height:1.2}
+ #tablero.desktop-columns .fixed-route.special{color:#845307}
+ #tablero.desktop-columns .fila .actions{grid-column:1/-1;grid-row:4;justify-content:flex-end;gap:4px;flex-wrap:wrap;border-top:1px solid #e1e7df;padding-top:5px}
+ #tablero.desktop-columns .grupo:not([data-destino=stgo]) .fila .estado{grid-row:1}
+ #tablero.desktop-columns .grupo:not([data-destino=stgo]) .fila .actions{grid-row:3}
+ #tablero.desktop-columns .fila .note-line{grid-column:1/-1;grid-row:auto;background:#fff3d9;color:#664a1d;padding:4px 6px;border-radius:4px;font-size:12px}
+ #tablero.desktop-columns .icon-button{display:inline-flex;align-items:center;justify-content:center;width:auto;min-height:28px;padding:3px 7px;font-size:12px;border-radius:6px;white-space:nowrap;color:#344c38;background:#fff;border-color:#c5d2c3}
+ #tablero.desktop-columns .icon-button .action-label{display:inline}
+ #tablero.desktop-columns .icon-button.remove{color:#942d2c;border-color:#e0c5c3}
+ #tablero.desktop-columns .tag{font-size:12px;font-weight:750;padding:4px 6px;line-height:1.2}
+ #tablero.desktop-columns .estado-detalle{font-size:11px;line-height:1.2}
+ #tablero.desktop-columns .extra-label,#tablero.desktop-columns .saving-mark{font-size:10px;line-height:1.15;margin-top:2px}
+ #tablero.desktop-columns .fila[data-status=despachado]{background:#eff6ed;border-left-color:#68a84f}
+ #tablero.desktop-columns .fila[data-status=cancelado]{background:#fff1ef;border-left-color:#c66b65}
+ #tablero.desktop-columns .fila[data-status=atrasado]{background:#fff7e5;border-left-color:#d99836}
+ #tablero.desktop-columns .fila[data-status=eliminado]{background:#f1f2f1;border-left-color:#999}
+ #tablero.desktop-columns .fila.proxima{background:#edf6ff;border-color:#a6c9e9;border-left-color:#287ab6;box-shadow:0 1px 4px #287ab61a}
+ #tablero.desktop-columns .fila.proxima .tag{background:#d4e9fc;color:#194f80}
+ #tablero.desktop-columns .fila .estado-detalle:empty,#tablero.desktop-columns .extra-label:empty,#tablero.desktop-columns .saving-mark:empty{display:none}
+}
+@media screen and (min-width:801px) and (max-width:1100px){
+ #tablero.desktop-columns{gap:6px;grid-template-columns:repeat(3,minmax(0,1fr))}
+ #tablero.desktop-columns .grupo-head{padding:8px}
+ #tablero.desktop-columns .grupo-head h3{font-size:17px}
+ #tablero.desktop-columns .rows{padding:5px 4px}
+ #tablero.desktop-columns .fila{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:6px}
+ #tablero.desktop-columns .fila .hora-col{grid-column:1;grid-row:1}
+ #tablero.desktop-columns .fila .campo-busNum{grid-column:2;grid-row:1}
+ #tablero.desktop-columns .fila .estado,#tablero.desktop-columns .grupo:not([data-destino=stgo]) .fila .estado{grid-column:1/-1;grid-row:2;flex-direction:row;align-items:center;justify-content:space-between;text-align:left}
+ #tablero.desktop-columns .fila .campo-horaLlegada{grid-column:1;grid-row:3}
+ #tablero.desktop-columns .fila .campo-horaReal{grid-column:2;grid-row:3}
+ #tablero.desktop-columns .hora-campo{display:grid;grid-template-columns:minmax(0,1fr)}
+ #tablero.desktop-columns .hora-campo input{width:100%}
+ #tablero.desktop-columns .fila .campo-tipo{grid-column:1;grid-row:4}
+ #tablero.desktop-columns .fila .campo-terminal{grid-column:2;grid-row:4}
+ #tablero.desktop-columns .fila .actions{grid-row:5}
+ #tablero.desktop-columns .grupo:not([data-destino=stgo]) .fila .actions{grid-row:4}
+ #tablero.desktop-columns .icon-button{padding:3px 5px;font-size:11px}
+}
+@media print{.desktop-aid{display:none!important}}
