@@ -26,3 +26,6 @@ Aplicación Cloudflare Pages + D1. La versión de producción no está modificad
 - [ ] Filtros, teclado, Android/iOS, escritorio y PDF con todas las filas vigentes; confirmar que no se muestran datos obsoletos.
 ## Privacidad
 Los horarios permanentes y las cuentas son configuración, no historial operativo. No introducir nombres de pasajeros ni otros datos personales en observaciones. Confirmar con la empresa si la retención técnica de infraestructura y las exportaciones están permitidas. No se ha desplegado desde esta rama.
+
+## Control 2.1
+Aplicar una vez `migrations/0007_horarios_operativos.sql` en D1 para configurar rutas y domingos. Conserva los registros del día y horarios dominicales que ya existan. La programación se copia desde lunes a sábado y tiene IDs propios para que se pueda editar por separado. El tablero toma ruta y terminal del horario permanente, no de los datos antiguos de operación. En extras sin configuración se muestra Directo / Terminal Sur para Santiago. En móvil una salida se mueve a Salidas anteriores solo cuando máquina, llegada y salida son válidas y todos sus cambios están guardados. Cancelados o retirados no se marcan completos automáticamente; los retirados se consultan con su filtro. En escritorio se muestran todos los servicios; el intervalo sigue siendo 12 s.

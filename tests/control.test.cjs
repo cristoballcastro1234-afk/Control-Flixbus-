@@ -11,7 +11,7 @@ test("Estados, hora de Chile y diferencia de minutos",()=>{
 test("Migraciones SQLite, semilla de 86 horarios y auditoría diaria",()=>{
  const db=new DatabaseSync(":memory:");
  try{
- for(const f of fs.readdirSync("migrations").filter(x=>x.endsWith(".sql")).sort())db.exec(fs.readFileSync("migrations/"+f,"utf8"));
+ for(const f of fs.readdirSync("migrations").filter(x=>x.endsWith(".sql")&&!x.startsWith("0007")).sort())db.exec(fs.readFileSync("migrations/"+f,"utf8"));
  assert.equal(db.prepare("SELECT COUNT(*) n FROM horarios WHERE grupo='semana'").get().n,86);
  assert.equal(db.prepare("SELECT COUNT(*) n FROM horarios WHERE grupo='domingo'").get().n,0);
  db.prepare("INSERT INTO horarios VALUES('stgo',999,'domingo','08:00','directo','sur')").run();
@@ -40,5 +40,16 @@ test("Revisión ligera: lectura sin cambios y cambios atómicos de turnos y hora
  db.prepare("UPDATE horarios SET tipo='directo' WHERE destino='stgo' AND slot_index=0").run();assert.equal(rev(),initial+3);
  db.prepare("DELETE FROM turnos WHERE fecha='22-11-2026'").run();assert.equal(rev(),initial+4);
  db.prepare("UPDATE sync_estado SET limpieza='22-11-2026' WHERE id=1").run();assert.equal(rev(),initial+4);
+ }finally{db.close()}
+});
+
+test("Programación de domingo y metadatos fijos",()=>{
+ const db=new DatabaseSync(":memory:");try{
+ for(const f of fs.readdirSync("migrations").filter(x=>x.endsWith(".sql")).sort())db.exec(fs.readFileSync("migrations/"+f,"utf8"));
+ const count=(destino)=>db.prepare("SELECT count(*) n FROM horarios WHERE grupo='domingo' AND destino=?").get(destino).n;
+ assert.equal(count("stgo"),39);assert.equal(count("cur"),30);assert.equal(count("scrz"),5);
+ assert.equal(db.prepare("SELECT count(*) n FROM horarios WHERE grupo='semana' AND destino='stgo' AND terminal='san-borja'").get().n,4);
+ assert.equal(db.prepare("SELECT count(*) n FROM horarios WHERE grupo='semana' AND destino='stgo' AND tipo='indirecto'").get().n,6);
+ db.exec(fs.readFileSync("migrations/0007_horarios_operativos.sql","utf8"));assert.equal(count("stgo"),39);
  }finally{db.close()}
 });

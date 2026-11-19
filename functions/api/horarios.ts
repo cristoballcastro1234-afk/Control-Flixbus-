@@ -20,7 +20,7 @@ export const onRequestPost:PagesFunction<Env,string,Datos>=async({env,data,reque
   return json({ok:true});
  }
  if(!["semana","domingo"].includes(String(p.grupo))||!horaValida(p.horaPlan))return json({error:"Horario inválido"},400);
- const tipo=String(p.tipo||""),terminal=String(p.terminal||"");
+ const tipo=String(p.tipo||(destino==="stgo"?"directo":"")),terminal=String(p.terminal||(destino==="stgo"?"sur":""));
  if(!["","directo","indirecto"].includes(tipo)||!["","sur","san-borja"].includes(terminal)||(destino!=="stgo"&&(tipo||terminal)))return json({error:"Ruta o terminal inválido"},400);
  if(p.accion==="editar"){
   if(!Number.isSafeInteger(id)||id<0)return json({error:"Horario inválido"},400);

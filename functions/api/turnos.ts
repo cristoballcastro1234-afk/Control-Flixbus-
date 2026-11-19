@@ -5,11 +5,11 @@ interface Env {DB:D1Database}
 type Contexto = {sesion:Sesion|null};
 type Turno = {destino:string;slotIndex:number;horaPlan:string;busNum:string;horaLlegada:string;horaReal:string;cancelado:number|boolean;eliminado:number|boolean;tipo:string|null;terminal:string|null;motivo:string;observacion:string;updatedAt:string;updatedBy:string};
 type Horario = {destino:string;slotIndex:number;horaPlan:string;tipo:string;terminal:string};
-const campos = {busNum:"bus_num",horaLlegada:"hora_llegada",horaReal:"hora_real",cancelado:"cancelado",eliminado:"eliminado",tipo:"tipo",terminal:"terminal",motivo:"motivo",observacion:"observacion"} as const;
+const campos = {busNum:"bus_num",horaLlegada:"hora_llegada",horaReal:"hora_real",cancelado:"cancelado",eliminado:"eliminado",motivo:"motivo",observacion:"observacion"} as const;
 type Campo = keyof typeof campos;
 const seleccionar = "SELECT destino,slot_index AS slotIndex,hora_plan AS horaPlan,bus_num AS busNum,hora_llegada AS horaLlegada,hora_real AS horaReal,cancelado,eliminado,tipo,terminal,motivo,observacion,updated_at AS updatedAt,updated_by AS updatedBy FROM turnos";
 const horarios = "SELECT destino,slot_index AS slotIndex,hora_plan AS horaPlan,tipo,terminal FROM horarios";
-function vista(t:Turno,h?:Horario) {return {...t, horaPlan:t.horaPlan.padStart(5,"0"),cancelado:!!t.cancelado,eliminado:!!t.eliminado,tipo:t.tipo??h?.tipo??"",terminal:t.terminal??h?.terminal??"",manual:!h};}
+function vista(t:Turno,h?:Horario) {return {...t, horaPlan:t.horaPlan.padStart(5,"0"),cancelado:!!t.cancelado,eliminado:!!t.eliminado,tipo:t.destino==="stgo"?(h?h.tipo||"directo":t.tipo||"directo"):"",terminal:t.destino==="stgo"?(h?h.terminal||"sur":t.terminal||"sur"):"",manual:!h};}
 export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,request}) => {
  if(!data.sesion)return json({error:"No autenticado"},401);
  const dia=diaChile();
@@ -51,13 +51,11 @@ export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,
  for(const r of porId.values())rows.push(vista(r));
  return json({...meta,now:Date.now(),revision,programados:hs.length,rows});
 };
-function validar(k:Campo,v:unknown,destino:string) {
+function validar(k:Campo,v:unknown) {
  if(k==="cancelado"||k==="eliminado")return typeof v==="boolean";
  if(typeof v!=="string")return false;
  if(k==="horaLlegada"||k==="horaReal")return v===""||horaValida(v);
  if(k==="busNum")return v.length<=30;
- if(k==="tipo")return destino==="stgo"?["","directo","indirecto"].includes(v):v==="";
- if(k==="terminal")return destino==="stgo"?["","sur","san-borja"].includes(v):v==="";
  return v.length<=250;
 }
 export const onRequestPost:PagesFunction<Env,string,Contexto> = async ({env,data,request}) => {
@@ -84,7 +82,7 @@ export const onRequestPost:PagesFunction<Env,string,Contexto> = async ({env,data
  const cambios=p.cambios;
  if(!cambios||typeof cambios!=="object"||Array.isArray(cambios))return json({error:"Cambios inválidos"},400);
  const pares=Object.entries(cambios as Record<string,unknown>);
- if(!pares.length||pares.some(([k,v])=>!Object.prototype.hasOwnProperty.call(campos,k)||!validar(k as Campo,v,destino)))return json({error:"Datos inválidos"},400);
+ if(!pares.length||pares.some(([k,v])=>!Object.prototype.hasOwnProperty.call(campos,k)||!validar(k as Campo,v)))return json({error:"Datos inválidos"},400);
  const h=await env.DB.prepare(horarios+" WHERE destino=? AND slot_index=? AND grupo=?").bind(destino,id,dia.grupo).first<Horario>();
  const existente=await env.DB.prepare(seleccionar+" WHERE fecha=? AND destino=? AND slot_index=?").bind(dia.fecha,destino,id).first<Turno>();
  if(!h&&!existente)return json({error:"Ese horario ya no existe"},404);
