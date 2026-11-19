@@ -185,3 +185,74 @@ dialog{border:1px solid #d4dfd3;border-radius:16px;padding:22px;width:min(94vw,4
  #tablero.desktop-columns .icon-button{padding:3px 5px;font-size:11px}
 }
 @media print{.desktop-aid{display:none!important}}
+
+/* Control 2.5 — oficina: paleta suave, jerarquía clara y una única acción habitual.
+   No modifica móvil, impresión, datos ni sincronización. */
+@media screen and (min-width:801px){
+ :root{--bg:#e1e8df;--paper:#eef2e9;--line:#c4d0c1;--ink:#25372a;--sub:#526657}
+ body{background:var(--bg);color:var(--ink)}
+ main{background:none}
+ .top{background:#304c38;border-bottom-color:#83b949}
+ .workspace{background:#e9eee5;border-color:#bdcaba;box-shadow:0 3px 12px #223b2310}
+ .metrics article{background:#edf2e8;border-color:#c9d5c5}
+ .metrics strong{color:#335e32}
+ .metrics .metric-alert strong{color:#875510}
+ .filters .tabs{background:#d9e4d6;border-color:#c3d1bf}
+ .tabs button[aria-pressed=true]{background:#365840}
+ .filter-right input,.filter-right select{background:#f4f5ed;border-color:#bdcdbb}
+ .primary{background:#a7cb7c;border-color:#89aa64;color:#25421a}
+ .secondary{background:#eff3eb;border-color:#c2d0c0}
+ #tablero.desktop-columns{gap:12px}
+ #tablero.desktop-columns>.grupo{background:#d6e1d4;border:1px solid #b6c7b4;border-radius:12px;box-shadow:0 2px 6px #243d2310}
+ #tablero.desktop-columns .grupo-head{background:#47694d;color:#f8fbf5;border-bottom-color:#45654a;padding:11px 12px}
+ #tablero.desktop-columns .grupo-head h3{font-size:21px;font-weight:760}
+ #tablero.desktop-columns .grupo-count{color:#f0f5ec;font-size:12px}
+ #tablero.desktop-columns .panel-guia{background:#e5ede0;border-bottom-color:#c0d0bd;padding:8px 10px}
+ #tablero.desktop-columns .resumen-destino{color:#364c39;font-size:12px;gap:5px 12px}
+ #tablero.desktop-columns .ir-pendiente{background:#dce8f2;color:#284c70;border-color:#a7bfd6;min-height:30px}
+ #tablero.desktop-columns .rows{padding:8px 7px;scrollbar-color:#7b9679 #c9d8c6}
+ #tablero.desktop-columns .fila{background:#f0f3ea;border-color:#bacbb7;border-left-color:#99ae95;box-shadow:0 1px 3px #304e2910;gap:7px;margin-bottom:8px;padding:9px}
+ #tablero.desktop-columns .fila:last-child{border-bottom-color:#bacbb7}
+ #tablero.desktop-columns .fila:hover{box-shadow:0 1px 5px #304e2920}
+ #tablero.desktop-columns .fila[data-status=despachado]{background:#dcebd7;border-color:#b5cbb0;border-left-color:#64934f}
+ #tablero.desktop-columns .fila[data-status=atrasado]{background:#f4e8ce;border-color:#d9c499;border-left-color:#b78232}
+ #tablero.desktop-columns .fila[data-status=cancelado]{background:#efdfda;border-color:#d7b6ae;border-left-color:#b66a61}
+ #tablero.desktop-columns .fila[data-status=eliminado]{background:#e3e7e0;border-color:#bfc9bb;border-left-color:#849181}
+ #tablero.desktop-columns .fila.proxima{background:#dbe9f1;border-color:#a9c3d5;border-left-color:#397da7}
+ #tablero.desktop-columns .fila .hora{color:#243b29;font-size:23px}
+ #tablero.desktop-columns .fila .campo label,#tablero.desktop-columns .hora-caption{color:#3d5542;font-size:12px;letter-spacing:0}
+ #tablero.desktop-columns .fila .campo input{background:#f8f8ef;color:#253a2b;border-color:#a9bda7;min-height:34px;font-size:16px}
+ #tablero.desktop-columns .fila .campo input::placeholder{color:#667969}
+ #tablero.desktop-columns .fila .campo input:focus{border-color:#386f97;outline:2px solid #386f97;outline-offset:1px}
+ #tablero.desktop-columns .now{background:#c8ddbf;color:#284b2b;border-color:#a5bf9d;font-size:12px;min-height:34px}
+ #tablero.desktop-columns .now:hover:not(:disabled){background:#b9d4af}
+ #tablero.desktop-columns .fila .ruta{background:#dce6d7;padding:5px 7px}
+ #tablero.desktop-columns .fixed-route{font-size:13px;color:#345039}
+ #tablero.desktop-columns .fixed-route.special{color:#79500c}
+ #tablero.desktop-columns .tag{border-radius:5px;font-size:12px;padding:4px 7px;background:#dde4d8;color:#425442}
+ #tablero.desktop-columns .tag[data-status=despachado]{background:#c0dcb6;color:#2b5323}
+ #tablero.desktop-columns .tag[data-status=atrasado]{background:#efd39e;color:#714b0f}
+ #tablero.desktop-columns .tag[data-status=cancelado]{background:#e7bdb5;color:#822d26}
+ #tablero.desktop-columns .fila.proxima .tag{background:#bcd8ea;color:#214d70}
+ #tablero.desktop-columns .estado-detalle{color:#4f6250;font-size:12px}
+ #tablero.desktop-columns .fila .actions{border-top-color:#b9cbb5;justify-content:flex-end;padding-top:5px}
+ #tablero.desktop-columns .actions .note-action,#tablero.desktop-columns .actions .remove,#tablero.desktop-columns .note-line{display:none!important}
+ #tablero.desktop-columns .actions .icon-button:not(.note-action):not(.remove){background:#e8e9df;color:#754740;border-color:#c9c2b7;min-height:30px;padding:4px 13px;font-size:12px}
+ #tablero.desktop-columns .actions .icon-button:not(.note-action):not(.remove):hover:not(:disabled){background:#eddbd4;border-color:#c59f91;color:#832f28}
+ #tablero.desktop-columns .fila[data-status=cancelado] .actions .icon-button{color:#365b35;background:#e2ebd9;border-color:#b9ccb1}
+ /* El registro retirado sigue siendo recuperable cuando se consulta ese filtro. */
+ #tablero.desktop-columns .restore{background:#e2ebd9;border-color:#b9ccb1;color:#365b35;min-height:30px}
+ #dlgNota .observacion-cancelacion{display:none}
+ #dlgNota{background:#edf2e8}
+}
+@media screen and (min-width:801px) and (max-width:1100px){
+ #tablero.desktop-columns{gap:7px}
+ #tablero.desktop-columns .grupo-head{padding:8px}
+ #tablero.desktop-columns .grupo-head h3{font-size:17px}
+ #tablero.desktop-columns .grupo-count{font-size:10px}
+ #tablero.desktop-columns .rows{padding:6px 4px}
+ #tablero.desktop-columns .fila{padding:7px;gap:6px}
+ #tablero.desktop-columns .fila .hora{font-size:21px}
+ #tablero.desktop-columns .fila .campo input{font-size:15px}
+ #tablero.desktop-columns .fila .campo label{font-size:11px}
+}
