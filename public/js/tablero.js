@@ -19,7 +19,7 @@ function resumenDestino(rows){const activos=rows.filter(r=>!r.eliminado);return 
 function ordenarServicios(rows){return [...rows].sort((a,b)=>(minutes(a.horaPlan)??1440)-(minutes(b.horaPlan)??1440)||a.destino.localeCompare(b.destino)||a.slotIndex-b.slotIndex);}
 function filasDelGrupo(all,d){return d==="todos"?all:all.filter(r=>r.destino===d);}
 function completo(r){return !!String(r.busNum||"").trim()&&minutes(r.horaLlegada)!==null&&minutes(r.horaReal)!==null;}
-function guardadoCompleto(r){const confirmado=serverRows.get(key(r));return !r.eliminado&&!!confirmado&&completo(confirmado);}
+function guardadoCompleto(r){const confirmado=serverRows.get(key(r));return !r.eliminado&&!!confirmado&&(confirmado.cancelado===true||confirmado.cancelado===1||completo(confirmado));}
 function historialVisible(r){return !mobile.matches||filter==="eliminado"||guardadoCompleto(r)===anteriores;}
 function setHistorial(valor){anteriores=valor;filter="";$("filtro").value="";search="";$("buscar").value="";render();}
 function official(){return new Date(Date.now()+offset)}

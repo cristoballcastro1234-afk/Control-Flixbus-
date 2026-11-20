@@ -99,3 +99,21 @@ test("Guía PC: resumen y registros pendientes sin ocultar despachos",()=>{
  assert.equal(JSON.stringify(result.pending),JSON.stringify([false,true,false,false,true]));
  assert.equal(result.allVisible,true);assert.equal(result.pc,true);
 });
+
+test("Cancelados confirmados pasan a salidas anteriores solo en móvil y se pueden reactivar",()=>{
+ const fragment=js.slice(0,js.indexOf('$("formNota").addEventListener'));
+ const ctx=vm.createContext({Intl,Date,Map,Set,console,matchMedia:()=>({matches:true})});
+ const result=vm.runInContext(fragment+`
+const r={destino:"stgo",slotIndex:1,busNum:"",horaLlegada:"",horaReal:"",eliminado:false,cancelado:false};const k=key(r);
+serverRows.set(k,r);
+const pendiente=historialVisible(r);
+const esperando=historialVisible({...r,cancelado:true});
+serverRows.set(k,{...r,cancelado:true});const cancelado=historialVisible({...r,cancelado:true});
+anteriores=true;const anterior=historialVisible({...r,cancelado:true});
+serverRows.set(k,r);const reactivado=historialVisible(r);
+anteriores=false;const vuelve=historialVisible(r);
+mobile.matches=false;const pc=historialVisible({...r,cancelado:true});
+({pendiente,esperando,cancelado,anterior,reactivado,vuelve,pc,interval:schedulePoll.toString().includes("12000")});
+`,ctx);
+ assert.equal(JSON.stringify(result),JSON.stringify({pendiente:true,esperando:true,cancelado:false,anterior:true,reactivado:false,vuelve:true,pc:true,interval:true}));
+});
