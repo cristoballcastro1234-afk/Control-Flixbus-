@@ -1,10 +1,12 @@
 
 import { diaChile, limpiarDias, destinos, horaValida, json, cuerpo, origenValido } from "../lib/dia";
 import type { Sesion } from "./auth";
-interface Env {DB:D1Database;GPS_CACHE?:KVNamespace;GPS_ENABLED?:string}
+interface Env {DB:D1Database;GPS_CACHE?:KVNamespace;GPS_ENABLED?:string;GPS_AUTO_HORARIOS?:string}
 type Contexto = {sesion:Sesion|null};
 type Turno = {destino:string;slotIndex:number;horaPlan:string;busNum:string;horaLlegada:string;horaReal:string;cancelado:number|boolean;eliminado:number|boolean;tipo:string|null;terminal:string|null;motivo:string;observacion:string;updatedAt:string;updatedBy:string};
 type Horario = {destino:string;slotIndex:number;horaPlan:string;tipo:string;terminal:string};
+type ProgramaOficial={visibles:Horario[];reservas:Horario[]};
+function programa(raw:unknown):ProgramaOficial|null{try{const p=JSON.parse(String(raw));const ok=(x:unknown)=>Array.isArray(x)&&x.length<=600&&x.every(r=>r&&destinos.has(r.destino)&&Number.isSafeInteger(r.slotIndex)&&r.slotIndex>=0&&horaValida(r.horaPlan));return ok(p.visibles)&&p.visibles.length>0&&ok(p.reservas)?p:null}catch{return null}}
 const campos = {busNum:"bus_num",horaLlegada:"hora_llegada",horaReal:"hora_real",cancelado:"cancelado",eliminado:"eliminado",motivo:"motivo",observacion:"observacion"} as const;
 type Campo = keyof typeof campos;
 const seleccionar = "SELECT destino,slot_index AS slotIndex,hora_plan AS horaPlan,bus_num AS busNum,hora_llegada AS horaLlegada,hora_real AS horaReal,cancelado,eliminado,tipo,terminal,motivo,observacion,updated_at AS updatedAt,updated_by AS updatedBy FROM turnos";
@@ -27,26 +29,30 @@ export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,
   const r=await env.DB.prepare("SELECT id,destino,slot_index AS slotIndex,usuario,momento,anterior,nuevo FROM actividad_dia WHERE fecha=? ORDER BY id DESC LIMIT 250").bind(dia.fecha).all();
   return json({fecha:dia.fecha,actividad:r.results});
  }
+ const auto=env.GPS_AUTO_HORARIOS==="true"&&env.GPS_ENABLED==="true";
  const meta={...dia,now:Date.now(),usuario:data.sesion.usuario,rol:data.sesion.rol,gpsHabilitado:env.GPS_ENABLED==="true"&&!!env.GPS_CACHE};
  if(estado.limpieza===dia.fecha && params.get("fecha")===dia.fecha && params.get("revision")===String(estado.revision)){
   return json({...meta,revision:estado.revision,sinCambios:true});
  }
  // La revisión y las filas se leen en una misma transacción D1, para no
  // marcar como recibido un cambio que no está incluido en la respuesta.
- const [rev,h,t]=await env.DB.batch<{revision:number}|Horario|Turno>([
+ const statements=[
  env.DB.prepare("SELECT revision FROM sync_estado WHERE id=1"),
  env.DB.prepare(horarios+" WHERE grupo=? ORDER BY hora_plan").bind(dia.grupo),
  env.DB.prepare(seleccionar+" WHERE fecha=?").bind(dia.fecha)
- ]);
+ ];
+ const [rev,h,t,o]=await env.DB.batch<{revision:number}|Horario|Turno|{datos:string}>(auto?[...statements,env.DB.prepare("SELECT datos FROM programacion_oficial WHERE id=1 AND fecha=?").bind(dia.fecha)]:statements).catch(()=>env.DB.batch<{revision:number}|Horario|Turno>(statements));
  if(diaChile().fecha!==dia.fecha)return json({error:"Cambió el día operativo. Reintenta."},409);
  const revision=Number((rev.results[0] as {revision:number}|undefined)?.revision);
  if(!Number.isSafeInteger(revision))return json({error:"Revisión inválida"},503);
- const hs=h.results as Horario[], ts=t.results as Turno[];
+ const respaldo=h.results as Horario[], ts=t.results as Turno[];
+ const oficial=programa((o?.results[0] as {datos:string}|undefined)?.datos);
+ const hs=oficial?.visibles||respaldo;
  const porId=new Map(ts.map(r=>[r.destino+":"+r.slotIndex,r]));
  const rows=hs.map(r=>{
   const k=r.destino+":"+r.slotIndex;
   const real=porId.get(k); porId.delete(k);
-  return vista(real||{...r,busNum:"",horaLlegada:"",horaReal:"",cancelado:false,eliminado:false,motivo:"",observacion:"",updatedAt:"",updatedBy:""},r);
+  return {...vista(real||{...r,busNum:"",horaLlegada:"",horaReal:"",cancelado:false,eliminado:false,motivo:"",observacion:"",updatedAt:"",updatedBy:""},r),...(oficial?{horaPlan:r.horaPlan,oficial:true}:{})};
  });
  // Los registros diarios heredados pueden tener un ID distinto al del horario.
  // Si existe una coincidencia inequívoca por destino y hora, usar sus metadatos
@@ -60,7 +66,7 @@ export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,
   const h=porHora.get(r.destino+":"+r.horaPlan.padStart(5,"0"));
   rows.push({...vista(r,h??undefined),manual:true});
  }
- return json({...meta,now:Date.now(),revision,programados:hs.length,rows});
+ return json({...meta,now:Date.now(),revision,programacionOficial:!!oficial,programados:hs.length,rows});
 };
 function validar(k:Campo,v:unknown) {
  if(k==="cancelado"||k==="eliminado")return typeof v==="boolean";
@@ -94,13 +100,16 @@ export const onRequestPost:PagesFunction<Env,string,Contexto> = async ({env,data
  if(!cambios||typeof cambios!=="object"||Array.isArray(cambios))return json({error:"Cambios inválidos"},400);
  const pares=Object.entries(cambios as Record<string,unknown>);
  if(!pares.length||pares.some(([k,v])=>!Object.prototype.hasOwnProperty.call(campos,k)||!validar(k as Campo,v)))return json({error:"Datos inválidos"},400);
- const h=await env.DB.prepare(horarios+" WHERE destino=? AND slot_index=? AND grupo=?").bind(destino,id,dia.grupo).first<Horario>();
+ let h=await env.DB.prepare(horarios+" WHERE destino=? AND slot_index=? AND grupo=?").bind(destino,id,dia.grupo).first<Horario>();
+ if(env.GPS_AUTO_HORARIOS==="true"&&env.GPS_ENABLED==="true"){
+  try{const o=await env.DB.prepare("SELECT datos FROM programacion_oficial WHERE id=1 AND fecha=?").bind(dia.fecha).first<{datos:string}>();const p=programa(o?.datos);h=p?.reservas.find(r=>r.destino===destino&&r.slotIndex===id)||h}catch{/* respaldo local */}
+ }
  const existente=await env.DB.prepare(seleccionar+" WHERE fecha=? AND destino=? AND slot_index=?").bind(dia.fecha,destino,id).first<Turno>();
  if(!h&&!existente)return json({error:"Ese horario ya no existe"},404);
  const valores=pares.map(([k,v])=>typeof v==="boolean"?Number(v):v);
  const columnas=pares.map(([k])=>campos[k as Campo]);
- const baseCols=["fecha","destino","slot_index","hora_plan","updated_at","updated_by"];
- const baseVals=[dia.fecha,destino,id,existente?.horaPlan??h!.horaPlan,ahora,quien];
+ const baseCols=["fecha","destino","slot_index","hora_plan","updated_at","updated_by","tipo","terminal"];
+ const baseVals=[dia.fecha,destino,id,existente?.horaPlan??h!.horaPlan,ahora,quien,h?.tipo??existente?.tipo??"",h?.terminal??existente?.terminal??""];
  // Solo se actualizan los campos editados: el resto no se sobrescribe.
  const sql="INSERT INTO turnos("+baseCols.concat(columnas).join(",")+") VALUES("+baseCols.concat(columnas).map(()=>"?").join(",")+") ON CONFLICT(fecha,destino,slot_index) DO UPDATE SET "+columnas.map(c=>c+"=excluded."+c).concat(["updated_at=excluded.updated_at","updated_by=excluded.updated_by"]).join(",");
  if(diaChile().fecha!==dia.fecha)return json({error:"Cambió el día operativo. Actualiza el tablero."},409);

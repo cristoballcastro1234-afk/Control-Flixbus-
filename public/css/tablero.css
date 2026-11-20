@@ -320,3 +320,5 @@ dialog{border:1px solid #d4dfd3;border-radius:16px;padding:22px;width:min(94vw,4
 
 /* Piloto GPS: indicación compacta, no sustituye campos operativos. */
 .gps-estado{margin:6px 0 10px;padding:8px 10px;background:#dce8f2;color:#284c70;border-radius:7px;font-weight:650;font-size:12px}.gps-line{grid-column:1/-1;grid-row:auto;padding:5px 7px;background:#e2ebf1;color:#284c70;border-radius:6px;font-weight:650;font-size:12px;line-height:1.4;overflow-wrap:anywhere}@media print{.gps-line,.gps-estado{display:none!important}}
+
+.gps-directo{display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;border-radius:9px;font-size:13px;font-weight:650;min-height:40px}

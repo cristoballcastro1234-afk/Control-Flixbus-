@@ -4,8 +4,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#17251c">
 <title>Control de buses | FlixBus</title>
-<link rel="stylesheet" href="/css/tablero.css?v=2.7-gps">
-<script src="/js/tablero.js?v=2.7-gps" defer></script>
+<link rel="stylesheet" href="/css/tablero.css?v=2.8">
+<script src="/js/tablero.js?v=2.8" defer></script>
 </head>
 <body>
 <header class="top">
@@ -17,7 +17,7 @@
 <main>
  <div class="intro">
   <div><div class="eyebrow">OPERACIONES DIARIAS</div><h1>Control de salidas</h1><p id="fecha">Consultando fecha oficial de Chile…</p></div>
-  <div class="toolbar no-print"><button id="actividad" class="secondary">Actividad de hoy</button><button id="horarios" class="secondary" hidden>Horarios permanentes</button><button id="imprimir" class="primary">Imprimir / PDF</button></div>
+  <div class="toolbar no-print"><a class="secondary gps-directo" href="https://www.flixbus.cl/track/station/7628e209-3267-4fff-bf99-7255e109a9fc/departures" target="_blank" rel="noopener noreferrer">GPS oficial ↗</a><button id="actividad" class="secondary">Actividad de hoy</button><button id="horarios" class="secondary" hidden>Horarios permanentes</button><button id="imprimir" class="primary">Imprimir / PDF</button></div>
  </div>
  <section class="connection no-print" id="conexion" role="status" aria-live="polite"><span id="estadoConexion">Conectando con el servidor…</span><div><button id="reintentar" class="link-button" hidden>Reintentar</button><button id="descartar" class="link-button danger-text" hidden>Descartar pendientes</button></div></section>
  <section class="metrics" aria-label="Indicadores de hoy">
