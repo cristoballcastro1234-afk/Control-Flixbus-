@@ -175,7 +175,7 @@
                             <input type="password" id="nueva-clave" autocomplete="new-password" required>
                         </div>
                         <div>
-                            <label for="nuevo-rol">Rol</label>
+                            <label for="nueva-oficina">Oficina del operador</label><select id="nueva-oficina"><option value="sanfernando">San Fernando</option><option value="santiago">Santiago</option><option value="curico">Curicó</option><option value="rancagua">Rancagua</option></select><label for="nuevo-rol">Rol</label>
                             <select id="nuevo-rol">
                                 <option value="operador">Operador</option>
                                 <option value="admin">Administrador</option>
@@ -264,7 +264,7 @@
                     const tr = document.createElement("tr");
 
                     const tdUsuario = document.createElement("td");
-                    tdUsuario.textContent = u.usuario;
+                    tdUsuario.textContent = u.usuario + " · " + (u.rol==="admin"?"Todas":u.oficina);
 
                     const tdNombre = document.createElement("td");
                     tdNombre.textContent = u.nombre || "—";
@@ -292,6 +292,7 @@
                         btnEstado.style.marginRight = "6px";
                         btnEstado.addEventListener("click", function () { cambiarEstado(u); });
                         tdAcciones.appendChild(btnEstado);
+                        if(u.rol!=="admin"){const sel=document.createElement("select");for(const [id,nombre] of Object.entries({sanfernando:"San Fernando",santiago:"Santiago",curico:"Curicó",rancagua:"Rancagua"})){const o=document.createElement("option");o.value=id;o.textContent=nombre;sel.append(o)}sel.value=u.oficina;sel.addEventListener("change",()=>{if(!confirm("¿Cambiar oficina y cerrar sesiones anteriores?")){sel.value=u.oficina;return}llamarApi({accion:"asignar-oficina",usuario:u.usuario,oficina:sel.value}).then(cargarUsuarios).catch(e=>{mostrarMensaje("msg-lista",e.message,"error");sel.value=u.oficina})});tdAcciones.appendChild(sel)}
                         const btnEliminar = document.createElement("button");
                         btnEliminar.className = "btn-peligro";
                         btnEliminar.textContent = "Eliminar";
@@ -356,6 +357,7 @@
             nombre: document.getElementById("nuevo-nombre").value,
             password: document.getElementById("nueva-clave").value,
             rol: document.getElementById("nuevo-rol").value,
+            oficina: document.getElementById("nueva-oficina").value,
         })
             .then(function () {
                 mostrarMensaje("msg-crear", "Usuario creado correctamente", "ok");
