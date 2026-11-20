@@ -91,9 +91,10 @@ async function consultar(env,from,to){
  url.searchParams.set("from",new Date(from).toISOString());url.searchParams.set("to",new Date(to).toISOString());
  url.searchParams.set("apiKey",env.GPS_API_KEY);
  let res;
- try{res=await fetch(url,{signal:AbortSignal.timeout(8000),redirect:"error",headers:{Accept:"application/json"}})}
+ try{res=await fetch(url.toString(),{signal:AbortSignal.timeout(8000),redirect:"manual",headers:{Accept:"application/json"}})}
  catch(e){console.warn(e?.name==="TimeoutError"||e?.name==="AbortError"?"GPS: tiempo de espera agotado":"GPS: fallo de conexión o redirección");throw Error("Consulta fallida")}
  console.log("GPS: respuesta HTTP "+res.status);
+ if(res.status>=300&&res.status<400){console.warn("GPS: redirección recibida; no se sigue ni se reenvía la clave");await env.GPS_CACHE.put("pausa","1",{expirationTtl:3600});throw Error("Redirección GPS")}
  if([401,403,429].includes(res.status)){
   console.warn("GPS: acceso rechazado o límite del proveedor; pausa de una hora");
   await env.GPS_CACHE.put("pausa","1",{expirationTtl:3600});throw Error("Acceso GPS rechazado");
