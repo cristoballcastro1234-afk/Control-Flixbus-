@@ -8,7 +8,7 @@ export const ESTACIONES = {
  santacruz:{nombre:"Santa Cruz",id:"23b9fd59-ce00-447d-bdd8-6e6f43f8f63a"}
 } as const;
 const POR_OFICINA:Record<Oficina,readonly (keyof typeof ESTACIONES)[]> = {
- sanfernando:["sanfernando"],curico:["curico"],rancagua:["rancagua"],santiago:["santiagoSur"]
+ sanfernando:["sanfernando"],curico:["curico"],rancagua:["rancagua"],santiago:["santiagoSur"],santacruz:["santacruz"]
 };
-// Santa Cruz queda registrada como estación candidata, no como oficina independiente.
+// Santiago utiliza únicamente Terminal Sur.
 export function estacionesOficina(o:Oficina){return POR_OFICINA[o].map(k=>ESTACIONES[k])}
