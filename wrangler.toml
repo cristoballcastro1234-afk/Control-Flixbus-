@@ -12,5 +12,5 @@ binding = "GPS_CACHE"
 id = "715e6f3981204389b93ee5290747de44"
 
 [vars]
-GPS_ENABLED = "false"
+GPS_ENABLED = "true"
 GPS_AUTO_HORARIOS = "false"
