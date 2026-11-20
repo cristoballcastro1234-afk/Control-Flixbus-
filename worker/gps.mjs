@@ -90,11 +90,19 @@ async function consultar(env,from,to){
  const url=new URL("https://global.api.flixbus.com/gis/v2/timetable/"+STOP+"/departures");
  url.searchParams.set("from",new Date(from).toISOString());url.searchParams.set("to",new Date(to).toISOString());
  url.searchParams.set("apiKey",env.GPS_API_KEY);
- const res=await fetch(url,{signal:AbortSignal.timeout(8000),redirect:"error",headers:{Accept:"application/json"}});
- if([401,403,429].includes(res.status)){await env.GPS_CACHE.put("pausa","1",{expirationTtl:3600});throw Error("Acceso GPS rechazado");}
+ let res;
+ try{res=await fetch(url,{signal:AbortSignal.timeout(8000),redirect:"error",headers:{Accept:"application/json"}})}
+ catch(e){console.warn(e?.name==="TimeoutError"||e?.name==="AbortError"?"GPS: tiempo de espera agotado":"GPS: fallo de conexión o redirección");throw Error("Consulta fallida")}
+ console.log("GPS: respuesta HTTP "+res.status);
+ if([401,403,429].includes(res.status)){
+  console.warn("GPS: acceso rechazado o límite del proveedor; pausa de una hora");
+  await env.GPS_CACHE.put("pausa","1",{expirationTtl:3600});throw Error("Acceso GPS rechazado");
+ }
  if(!res.ok)throw Error("GPS HTTP "+res.status);
- const raw=await res.text();if(raw.length>1500000)throw Error("Respuesta demasiado grande");
- return JSON.parse(raw);
+ let raw;try{raw=await res.text()}catch{console.warn("GPS: fallo al leer respuesta");throw Error("Lectura fallida")}
+ if(raw.length>1500000){console.warn("GPS: respuesta demasiado grande");throw Error("Respuesta demasiado grande")}
+ try{const payload=JSON.parse(raw);if(!Array.isArray(payload?.rides)){console.warn("GPS: JSON sin lista rides");throw Error("Estructura inválida")}console.log("GPS: servicios recibidos "+payload.rides.length);return payload}
+ catch{console.warn("GPS: JSON inválido o estructura inesperada");throw Error("Respuesta inválida")}
 }
 function rangoDia(now){
  const p=local(new Date(now).toISOString()),[hh,mm]=p.hora.split(":").map(Number);
@@ -127,14 +135,16 @@ async function actualizarPrograma(env,now,fecha,grupo){
 export default {
  async fetch(){return new Response("Not Found",{status:404});},
  async scheduled(_event,env){
-  if(env.GPS_ENABLED!=="true"||!env.GPS_API_KEY||!env.GPS_CACHE)return;
+  if(env.GPS_ENABLED!=="true"){console.log("GPS: desactivado; sin consultas externas");return}
+  if(!env.GPS_API_KEY){console.warn("GPS: falta configurar la clave");return}
+  if(!env.GPS_CACHE){console.warn("GPS: falta vinculación KV");return}
   const now=Date.now(),p=local(new Date(now).toISOString()),hora=p.hora;
   const auto=env.GPS_AUTO_HORARIOS==="true"&&!!env.DB;
   if(auto&&hora==="00:00"){
    try{await env.DB.prepare("DELETE FROM programacion_oficial WHERE fecha<>?").bind(p.fecha).run()}catch{console.warn("Limpieza de programación no disponible")}
   }
   if(hora<"05:30"||hora>"21:40")return;
-  if(await env.GPS_CACHE.get("pausa"))return;
+  if(await env.GPS_CACHE.get("pausa")){console.log("GPS: pausa del proveedor activa");return}
   let dato=null;
   // Revisión completa al comienzo de la jornada y cada 30 minutos;
   // seguimiento ligero cada 5 minutos. No se deducen bajas de una ventana parcial.
@@ -152,7 +162,10 @@ export default {
    }
    // No persistir identificadores externos, coordenadas ni recorridos completos en KV.
    const rows=dato.rows.map(({rideId,...r})=>r);
-   await env.GPS_CACHE.put("actual",JSON.stringify({...dato,rows}),{expirationTtl:600});
-  }catch{console.warn("GPS no disponible");}
+   console.log("GPS: servicios válidos en San Fernando "+rows.length);
+   try{await env.GPS_CACHE.put("actual",JSON.stringify({...dato,rows}),{expirationTtl:600})}
+   catch{console.warn("GPS: no se pudo guardar en KV");return}
+   console.log("GPS: caché actual guardada");
+  }catch{console.warn("GPS: consulta o procesamiento fallido; se conserva respaldo");}
  }
 };
