@@ -1,5 +1,6 @@
+import {oficinaValida} from "../lib/oficinas";
 interface Env {
-  DB: D1Database;
+  PILOT_DB: D1Database;
   SESSION_SECRET: string;
 }
 
@@ -7,6 +8,7 @@ export interface Sesion {
   usuario: string;
   rol: string;
   cuenta: string;
+  oficina?: string;
 }
 
 // Cloudflare limita PBKDF2 a 100.000 iteraciones y el plan gratuito da 10ms de CPU
@@ -126,12 +128,12 @@ function cookieSesion(token: string, maxAgeSeg: number): string {
 // ---------- helpers de datos ----------
 
 async function contarUsuarios(env: Env): Promise<number> {
-  const fila = await env.DB.prepare("SELECT COUNT(*) as total FROM usuarios").first<{ total: number }>();
+  const fila = await env.PILOT_DB.prepare("SELECT COUNT(*) as total FROM usuarios").first<{ total: number }>();
   return fila?.total ?? 0;
 }
 
 async function contarAdmins(env: Env): Promise<number> {
-  const fila = await env.DB
+  const fila = await env.PILOT_DB
     .prepare("SELECT COUNT(*) as total FROM usuarios WHERE rol = 'admin' AND activo = 1")
     .first<{ total: number }>();
   return fila?.total ?? 0;
@@ -164,8 +166,8 @@ export const onRequestGet: PagesFunction<Env, string, { sesion: Sesion | null }>
 
   if (accion === "listar") {
     if (!sesion || sesion.rol !== "admin") return json({ error: "Sin permiso" }, 403);
-    const { results } = await context.env.DB
-      .prepare("SELECT usuario, nombre, rol, activo, creado_en as creadoEn FROM usuarios ORDER BY usuario")
+    const { results } = await context.env.PILOT_DB
+      .prepare("SELECT usuario, nombre, rol, activo, oficina, creado_en as creadoEn FROM usuarios ORDER BY usuario")
       .all();
     return json((results || []).map((u: any) => ({ ...u, activo: !!u.activo })));
   }
@@ -207,7 +209,7 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
     if (errorPassword) return json({ error: errorPassword }, 400);
 
     const creadoEn = new Date().toISOString();
-    await context.env.DB
+    await context.env.PILOT_DB
       .prepare(
         `INSERT INTO usuarios (usuario, nombre, password_hash, rol, activo, creado_en)
          VALUES (?, ?, ?, 'admin', 1, ?)`,
@@ -227,7 +229,7 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
     const password = String(payload.password || "");
     if (password.length > 200 || !USUARIO_PATTERN.test(usuario)) return json({error:"Usuario o contraseña incorrectos"},401);
 
-    const fila = await context.env.DB
+    const fila = await context.env.PILOT_DB
       .prepare("SELECT usuario, nombre, password_hash as passwordHash, rol, activo, creado_en as creadoEn, sesion_version as sessionVersion, intentos_fallidos as intentos, bloqueado_hasta as bloqueadoHasta FROM usuarios WHERE usuario = ?")
       .bind(usuario)
       .first<any>();
@@ -249,7 +251,7 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
       const intentos = Number(fila.intentos || 0) + 1;
       const bloqueadoHasta =
         intentos >= MAX_INTENTOS ? new Date(Date.now() + BLOQUEO_MINUTOS * 60000).toISOString() : "";
-      await context.env.DB
+      await context.env.PILOT_DB
         .prepare("UPDATE usuarios SET intentos_fallidos = ?, bloqueado_hasta = ? WHERE usuario = ?")
         .bind(intentos >= MAX_INTENTOS ? 0 : intentos, bloqueadoHasta, usuario)
         .run();
@@ -257,7 +259,7 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
     }
 
     if (Number(fila.intentos || 0) !== 0 || fila.bloqueadoHasta) {
-      await context.env.DB
+      await context.env.PILOT_DB
         .prepare("UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = '' WHERE usuario = ?")
         .bind(usuario)
         .run();
@@ -284,7 +286,7 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
     const errorPassword = validarPassword(nueva);
     if (errorPassword) return json({ error: errorPassword }, 400);
 
-    const fila = await context.env.DB
+    const fila = await context.env.PILOT_DB
       .prepare("SELECT password_hash as passwordHash FROM usuarios WHERE usuario = ?")
       .bind(sesion.usuario)
       .first<any>();
@@ -292,7 +294,7 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
       return json({ error: "La contraseña actual no es correcta" }, 401);
     }
 
-    await context.env.DB
+    await context.env.PILOT_DB
       .prepare("UPDATE usuarios SET password_hash = ? WHERE usuario = ?")
       .bind(await hashPassword(nueva), sesion.usuario)
       .run();
@@ -306,26 +308,34 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
     const usuario = normalizarUsuario(payload.usuario);
     const password = String(payload.password || "");
     const rol = String(payload.rol || "operador") === "admin" ? "admin" : "operador";
+    const oficina=payload.oficina||"sanfernando";if(!oficinaValida(oficina))return json({error:"Oficina inválida"},400);
     if (!USUARIO_PATTERN.test(usuario)) {
       return json({ error: "Usuario inválido (3 a 30 caracteres: letras, números, punto, guion)" }, 400);
     }
     const errorPassword = validarPassword(password);
     if (errorPassword) return json({ error: errorPassword }, 400);
 
-    const existe = await context.env.DB
+    const existe = await context.env.PILOT_DB
       .prepare("SELECT usuario FROM usuarios WHERE usuario = ?")
       .bind(usuario)
       .first();
     if (existe) return json({ error: "Ese usuario ya existe" }, 409);
 
-    await context.env.DB
+    await context.env.PILOT_DB
       .prepare(
-        `INSERT INTO usuarios (usuario, nombre, password_hash, rol, activo, creado_en)
-         VALUES (?, ?, ?, ?, 1, ?)`,
+        `INSERT INTO usuarios (usuario, nombre, password_hash, rol, activo, creado_en, oficina)
+         VALUES (?, ?, ?, ?, 1, ?, ?)`,
       )
-      .bind(usuario, String(payload.nombre || usuario).slice(0, 60), await hashPassword(password), rol, new Date().toISOString())
+      .bind(usuario, String(payload.nombre || usuario).slice(0, 60), await hashPassword(password), rol, new Date().toISOString(),oficina)
       .run();
     return json({ ok: true });
+  }
+
+  if(accion==="asignar-oficina"){
+    const usuario=normalizarUsuario(payload.usuario);const oficina=payload.oficina;
+    if(!oficinaValida(oficina))return json({error:"Oficina inválida"},400);
+    const r=await context.env.PILOT_DB.prepare("UPDATE usuarios SET oficina=?,sesion_version=sesion_version+1 WHERE usuario=? AND rol='operador' AND oficina<>?").bind(oficina,usuario,oficina).run();
+    return r.meta.changes?json({ok:true}):json({error:"Usuario no encontrado, administrador o sin cambios"},400);
   }
 
   if (accion === "resetear-clave") {
@@ -334,7 +344,7 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
     const errorPassword = validarPassword(password);
     if (errorPassword) return json({ error: errorPassword }, 400);
 
-    const resultado = await context.env.DB
+    const resultado = await context.env.PILOT_DB
       .prepare("UPDATE usuarios SET password_hash = ?, intentos_fallidos = 0, bloqueado_hasta = '' WHERE usuario = ?")
       .bind(await hashPassword(password), usuario)
       .run();
@@ -347,8 +357,8 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
     if (usuario === sesion.usuario || typeof payload.activo !== "boolean") return json({error:"Acción inválida"},400);
     // Incrementar la versión al desactivar invalida tokens anteriores a una reactivación.
     const r = payload.activo
-      ? await context.env.DB.prepare("UPDATE usuarios SET activo=1 WHERE usuario=? AND activo=0").bind(usuario).run()
-      : await context.env.DB.prepare("UPDATE usuarios SET activo=0, sesion_version=sesion_version+1 WHERE usuario=? AND activo=1 AND (rol<>'admin' OR (SELECT COUNT(*) FROM usuarios WHERE rol='admin' AND activo=1)>1)").bind(usuario).run();
+      ? await context.env.PILOT_DB.prepare("UPDATE usuarios SET activo=1 WHERE usuario=? AND activo=0").bind(usuario).run()
+      : await context.env.PILOT_DB.prepare("UPDATE usuarios SET activo=0, sesion_version=sesion_version+1 WHERE usuario=? AND activo=1 AND (rol<>'admin' OR (SELECT COUNT(*) FROM usuarios WHERE rol='admin' AND activo=1)>1)").bind(usuario).run();
     if (!r.meta.changes) return json({error:"Usuario no encontrado, sin cambios o último administrador"},400);
     return json({ok:true});
   }
@@ -357,7 +367,7 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
     const usuario = normalizarUsuario(payload.usuario);
     if (usuario === sesion.usuario) return json({ error: "No puedes eliminar tu propio usuario" }, 400);
 
-    const fila = await context.env.DB
+    const fila = await context.env.PILOT_DB
       .prepare("SELECT rol, activo FROM usuarios WHERE usuario = ?")
       .bind(usuario)
       .first<any>();
@@ -366,7 +376,7 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
       return json({ error: "Debe quedar al menos un administrador" }, 400);
     }
 
-    const r = await context.env.DB.prepare("DELETE FROM usuarios WHERE usuario=? AND (rol<>\'admin\' OR activo=0 OR (SELECT COUNT(*) FROM usuarios WHERE rol=\'admin\' AND activo=1)>1)").bind(usuario).run();
+    const r = await context.env.PILOT_DB.prepare("DELETE FROM usuarios WHERE usuario=? AND (rol<>\'admin\' OR activo=0 OR (SELECT COUNT(*) FROM usuarios WHERE rol=\'admin\' AND activo=1)>1)").bind(usuario).run();
     if (!r.meta.changes) return json({error:"Debe quedar al menos un administrador activo"},400);
     return json({ ok: true });
   }

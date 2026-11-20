@@ -1,9 +1,8 @@
 import { leerCookieSesion, verificarToken, type Sesion } from "./api/auth";
+import {baseOficina,oficinaValida,puedeAcceder,notificar,type Oficina,type PilotoEnv} from "./lib/oficinas";
 
-interface Env {
-  DB: D1Database;
-  SESSION_SECRET: string;
-}
+type Env=PilotoEnv;
+type Datos={sesion:Sesion|null;office?:Oficina;officeDb?:D1Database};
 
 // Rutas accesibles sin haber iniciado sesión: la pantalla de acceso y la API que
 // la atiende. Todo lo demás (incluida la página principal y /api/turnos) exige sesión.
@@ -11,10 +10,11 @@ interface Env {
 // si solo se permitiera una, se produciría un bucle infinito de redirecciones.
 const RUTAS_PUBLICAS = new Set(["/login", "/login.html", "/favicon.ico"]);
 
-export const onRequest: PagesFunction<Env, string, { sesion: Sesion | null }> = async (context) => {
+export const onRequest: PagesFunction<Env, string, Datos> = async (context) => {
   const url = new URL(context.request.url);
   const ruta = url.pathname;
   const secreto = context.env.SESSION_SECRET || "";
+  if(!context.env.PILOT_DB||!secreto)return new Response("Piloto sin configurar",{status:503});
 
   // La sesión se resuelve siempre para que las funciones siguientes puedan usarla,
   // aunque la ruta sea pública.
@@ -24,8 +24,8 @@ export const onRequest: PagesFunction<Env, string, { sesion: Sesion | null }> = 
   // Cambiar la contraseña no altera el identificador de la cuenta.
   if (context.data.sesion) {
     const s=context.data.sesion;
-    const cuenta=await context.env.DB.prepare("SELECT rol,activo,creado_en AS creadoEn,sesion_version AS sessionVersion FROM usuarios WHERE usuario=?").bind(s.usuario).first<{rol:string;activo:number;creadoEn:string;sessionVersion:number}>();
-    context.data.sesion=cuenta?.activo && cuenta.creadoEn+":"+cuenta.sessionVersion===s.cuenta ? {...s,rol:cuenta.rol} : null;
+    const cuenta=await context.env.PILOT_DB.prepare("SELECT rol,activo,creado_en AS creadoEn,sesion_version AS sessionVersion,oficina FROM usuarios WHERE usuario=?").bind(s.usuario).first<{rol:string;activo:number;creadoEn:string;sessionVersion:number;oficina:string}>();
+    context.data.sesion=cuenta?.activo && cuenta.creadoEn+":"+cuenta.sessionVersion===s.cuenta ? {...s,rol:cuenta.rol,oficina:cuenta.oficina} : null;
   }
   if (RUTAS_PUBLICAS.has(ruta) || ruta === "/api/auth") {
     return context.next();
@@ -46,5 +46,16 @@ export const onRequest: PagesFunction<Env, string, { sesion: Sesion | null }> = 
     return Response.redirect(new URL("/login", url).toString(), 302);
   }
 
+  const sesion=context.data.sesion;
+  const o=url.searchParams.get("oficina")||sesion.oficina||"sanfernando";
+  if(!oficinaValida(o)||!puedeAcceder(sesion.rol,sesion.oficina||"sanfernando",o))return Response.json({error:"Sin acceso a esta oficina"},{status:403});
+  if(["/api/turnos","/api/horarios","/api/gps","/api/realtime"].includes(ruta)){
+    const db=baseOficina(context.env,o);
+    if(!db)return Response.json({error:"Oficina todavía no configurada"},{status:503});
+    context.data.office=o;context.data.officeDb=db;
+    const response=await context.next();
+    if(response.ok&&context.request.method==="POST"&&["/api/turnos","/api/horarios"].includes(ruta))context.waitUntil(notificar(context.env,o));
+    return response;
+  }
   return context.next();
 };

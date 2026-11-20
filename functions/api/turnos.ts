@@ -1,8 +1,9 @@
+import {OFICINAS,destinoValido,type Oficina} from "../lib/oficinas";
 
 import { diaChile, limpiarDias, destinos, horaValida, json, cuerpo, origenValido } from "../lib/dia";
 import type { Sesion } from "./auth";
 interface Env {DB:D1Database;GPS_CACHE?:KVNamespace;GPS_ENABLED?:string;GPS_AUTO_HORARIOS?:string}
-type Contexto = {sesion:Sesion|null};
+type Contexto = {sesion:Sesion|null;office:Oficina;officeDb:D1Database};
 type Turno = {destino:string;slotIndex:number;horaPlan:string;busNum:string;horaLlegada:string;horaReal:string;cancelado:number|boolean;eliminado:number|boolean;tipo:string|null;terminal:string|null;motivo:string;observacion:string;updatedAt:string;updatedBy:string};
 type Horario = {destino:string;slotIndex:number;horaPlan:string;tipo:string;terminal:string};
 type ProgramaOficial={visibles:Horario[];reservas:Horario[]};
@@ -16,32 +17,32 @@ export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,
  if(!data.sesion)return json({error:"No autenticado"},401);
  const dia=diaChile();
  const params=new URL(request.url).searchParams;
- const estado=await env.DB.prepare("SELECT revision,limpieza FROM sync_estado WHERE id=1").first<{revision:number;limpieza:string}>();
+ const estado=await data.officeDb.prepare("SELECT revision,limpieza FROM sync_estado WHERE id=1").first<{revision:number;limpieza:string}>();
  if(!estado)return json({error:"Falta configurar la sincronización"},503);
  // Solo el primer acceso de cada día ejecuta la limpieza de respaldo.
  // El Cron independiente permanece activo aun sin visitantes.
  if(estado.limpieza!==dia.fecha){
-  await limpiarDias(env.DB);
+  await limpiarDias(data.officeDb);
   if(diaChile().fecha!==dia.fecha)return json({error:"Cambió el día operativo. Reintenta."},409);
-  await env.DB.prepare("UPDATE sync_estado SET limpieza=? WHERE id=1 AND limpieza<>?").bind(dia.fecha,dia.fecha).run();
+  await data.officeDb.prepare("UPDATE sync_estado SET limpieza=? WHERE id=1 AND limpieza<>?").bind(dia.fecha,dia.fecha).run();
  }
  if(params.get("accion")==="actividad"){
-  const r=await env.DB.prepare("SELECT id,destino,slot_index AS slotIndex,usuario,momento,anterior,nuevo FROM actividad_dia WHERE fecha=? ORDER BY id DESC LIMIT 250").bind(dia.fecha).all();
+  const r=await data.officeDb.prepare("SELECT id,destino,slot_index AS slotIndex,usuario,momento,anterior,nuevo FROM actividad_dia WHERE fecha=? ORDER BY id DESC LIMIT 250").bind(dia.fecha).all();
   return json({fecha:dia.fecha,actividad:r.results});
  }
- const auto=env.GPS_AUTO_HORARIOS==="true"&&env.GPS_ENABLED==="true";
- const meta={...dia,now:Date.now(),usuario:data.sesion.usuario,rol:data.sesion.rol,gpsHabilitado:env.GPS_ENABLED==="true"&&!!env.GPS_CACHE};
+ const auto=false; // No consultas GPS externas en el piloto.
+ const meta={...dia,now:Date.now(),usuario:data.sesion.usuario,rol:data.sesion.rol,gpsHabilitado:false,oficina:data.office,oficinaNombre:OFICINAS[data.office].nombre,destinos:OFICINAS[data.office].destinos,oficinas:Object.entries(OFICINAS).filter(([id])=>data.sesion!.rol==="admin"||id===data.office).map(([id,o])=>({id,nombre:o.nombre}))};
  if(estado.limpieza===dia.fecha && params.get("fecha")===dia.fecha && params.get("revision")===String(estado.revision)){
   return json({...meta,revision:estado.revision,sinCambios:true});
  }
  // La revisión y las filas se leen en una misma transacción D1, para no
  // marcar como recibido un cambio que no está incluido en la respuesta.
  const statements=[
- env.DB.prepare("SELECT revision FROM sync_estado WHERE id=1"),
- env.DB.prepare(horarios+" WHERE grupo=? ORDER BY hora_plan").bind(dia.grupo),
- env.DB.prepare(seleccionar+" WHERE fecha=?").bind(dia.fecha)
+ data.officeDb.prepare("SELECT revision FROM sync_estado WHERE id=1"),
+ data.officeDb.prepare(horarios+" WHERE grupo=? ORDER BY hora_plan").bind(dia.grupo),
+ data.officeDb.prepare(seleccionar+" WHERE fecha=?").bind(dia.fecha)
  ];
- const [rev,h,t,o]=await env.DB.batch<{revision:number}|Horario|Turno|{datos:string}>(auto?[...statements,env.DB.prepare("SELECT datos FROM programacion_oficial WHERE id=1 AND fecha=?").bind(dia.fecha)]:statements).catch(()=>env.DB.batch<{revision:number}|Horario|Turno>(statements));
+ const [rev,h,t,o]=await data.officeDb.batch<{revision:number}|Horario|Turno|{datos:string}>(auto?[...statements,data.officeDb.prepare("SELECT datos FROM programacion_oficial WHERE id=1 AND fecha=?").bind(dia.fecha)]:statements).catch(()=>data.officeDb.batch<{revision:number}|Horario|Turno>(statements));
  if(diaChile().fecha!==dia.fecha)return json({error:"Cambió el día operativo. Reintenta."},409);
  const revision=Number((rev.results[0] as {revision:number}|undefined)?.revision);
  if(!Number.isSafeInteger(revision))return json({error:"Revisión inválida"},503);
@@ -82,7 +83,7 @@ export const onRequestPost:PagesFunction<Env,string,Contexto> = async ({env,data
  const p=await cuerpo(request); if(!p)return json({error:"Petición inválida"},400);
  const dia=diaChile(); const destino=String(p.destino||"");
  if(p.fecha!==dia.fecha)return json({error:"Cambió el día operativo. Actualiza el tablero."},409);
- if(!destinos.has(destino))return json({error:"Destino inválido"},400);
+ if(!destinoValido(data.office,destino))return json({error:"Destino inválido"},400);
  // El Worker programado y el primer GET del día ya se ocupan de la limpieza.
  const quien=data.sesion.usuario;
  const ahora=new Date().toISOString();
@@ -92,7 +93,7 @@ export const onRequestPost:PagesFunction<Env,string,Contexto> = async ({env,data
   const id=Number(p.slotIndex);
   if(!Number.isSafeInteger(id)||id<1000000000000)return json({error:"Identificador inválido"},400);
   if(diaChile().fecha!==dia.fecha)return json({error:"Cambió el día operativo. Actualiza el tablero."},409);
-  await env.DB.prepare("INSERT INTO turnos(fecha,destino,slot_index,hora_plan,updated_at,updated_by) VALUES(?,?,?,?,?,?) ON CONFLICT(fecha,destino,slot_index) DO NOTHING").bind(dia.fecha,destino,id,p.horaPlan,ahora,quien).run();
+  await data.officeDb.prepare("INSERT INTO turnos(fecha,destino,slot_index,hora_plan,updated_at,updated_by) VALUES(?,?,?,?,?,?) ON CONFLICT(fecha,destino,slot_index) DO NOTHING").bind(dia.fecha,destino,id,p.horaPlan,ahora,quien).run();
   return json({ok:true,slotIndex:id});
  }
  const id=Number(p.slotIndex);
@@ -101,11 +102,11 @@ export const onRequestPost:PagesFunction<Env,string,Contexto> = async ({env,data
  if(!cambios||typeof cambios!=="object"||Array.isArray(cambios))return json({error:"Cambios inválidos"},400);
  const pares=Object.entries(cambios as Record<string,unknown>);
  if(!pares.length||pares.some(([k,v])=>!Object.prototype.hasOwnProperty.call(campos,k)||!validar(k as Campo,v)))return json({error:"Datos inválidos"},400);
- let h=await env.DB.prepare(horarios+" WHERE destino=? AND slot_index=? AND grupo=?").bind(destino,id,dia.grupo).first<Horario>();
- if(env.GPS_AUTO_HORARIOS==="true"&&env.GPS_ENABLED==="true"){
-  try{const o=await env.DB.prepare("SELECT datos FROM programacion_oficial WHERE id=1 AND fecha=?").bind(dia.fecha).first<{datos:string}>();const p=programa(o?.datos);h=p?.reservas.find(r=>r.destino===destino&&r.slotIndex===id)||h}catch{/* respaldo local */}
+ let h=await data.officeDb.prepare(horarios+" WHERE destino=? AND slot_index=? AND grupo=?").bind(destino,id,dia.grupo).first<Horario>();
+ if(false){
+  try{const o=await data.officeDb.prepare("SELECT datos FROM programacion_oficial WHERE id=1 AND fecha=?").bind(dia.fecha).first<{datos:string}>();const p=programa(o?.datos);h=p?.reservas.find(r=>r.destino===destino&&r.slotIndex===id)||h}catch{/* respaldo local */}
  }
- const existente=await env.DB.prepare(seleccionar+" WHERE fecha=? AND destino=? AND slot_index=?").bind(dia.fecha,destino,id).first<Turno>();
+ const existente=await data.officeDb.prepare(seleccionar+" WHERE fecha=? AND destino=? AND slot_index=?").bind(dia.fecha,destino,id).first<Turno>();
  if(!h&&!existente)return json({error:"Ese horario ya no existe"},404);
  const valores=pares.map(([k,v])=>typeof v==="boolean"?Number(v):v);
  const columnas=pares.map(([k])=>campos[k as Campo]);
@@ -114,6 +115,6 @@ export const onRequestPost:PagesFunction<Env,string,Contexto> = async ({env,data
  // Solo se actualizan los campos editados: el resto no se sobrescribe.
  const sql="INSERT INTO turnos("+baseCols.concat(columnas).join(",")+") VALUES("+baseCols.concat(columnas).map(()=>"?").join(",")+") ON CONFLICT(fecha,destino,slot_index) DO UPDATE SET "+columnas.map(c=>c+"=excluded."+c).concat(["updated_at=excluded.updated_at","updated_by=excluded.updated_by"]).join(",");
  if(diaChile().fecha!==dia.fecha)return json({error:"Cambió el día operativo. Actualiza el tablero."},409);
- await env.DB.prepare(sql).bind(...baseVals,...valores).run();
+ await data.officeDb.prepare(sql).bind(...baseVals,...valores).run();
  return json({ok:true});
 };
