@@ -1,11 +1,7 @@
-name = "flixbus-limpieza-diaria"
+# Configurar bindings exclusivamente con bases del piloto antes de desplegar.
+name = "flixbus-limpieza-piloto"
 main = "worker/limpieza.ts"
-compatibility_date = "2024-09-23"
+compatibility_date = "2026-04-07"
 workers_dev = false
 [triggers]
-crons = ["* * * * *"]
-
-[[d1_databases]]
-binding = "DB"
-database_name = "flixbus-turnos-db"
-database_id = "876c7345-1b9e-4c19-98ee-e1e52dfba6ac"
+crons = ["0 3,4 * * *"]
