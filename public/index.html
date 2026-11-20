@@ -4,8 +4,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#17251c">
 <title>Control de buses | FlixBus</title>
-<link rel="stylesheet" href="/css/tablero.css?v=2.6">
-<script src="/js/tablero.js?v=2.6.2" defer></script>
+<link rel="stylesheet" href="/css/tablero.css?v=2.7-gps">
+<script src="/js/tablero.js?v=2.7-gps" defer></script>
 </head>
 <body>
 <header class="top">
@@ -38,7 +38,7 @@
    <button id="porCompletar" class="secondary" aria-pressed="true" type="button">Por completar</button>
    <button id="salidasAnteriores" class="secondary" aria-pressed="false" type="button">Salidas anteriores</button>
   </div>
-  <div id="avisoDomingo" class="notice" hidden></div>
+  <div id="avisoDomingo" class="notice" hidden></div><p id="gpsEstado" class="gps-estado no-print" hidden></p>
   <div id="tablero" aria-busy="true"><div class="empty">Cargando servicios…</div></div>
  </section>
  <footer>Control operativo · Hora oficial de Chile · Los registros operativos y su actividad se eliminan al cambiar de día.</footer>

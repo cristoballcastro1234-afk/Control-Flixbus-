@@ -1,7 +1,7 @@
 
 import { diaChile, limpiarDias, destinos, horaValida, json, cuerpo, origenValido } from "../lib/dia";
 import type { Sesion } from "./auth";
-interface Env {DB:D1Database}
+interface Env {DB:D1Database;GPS_CACHE?:KVNamespace;GPS_ENABLED?:string}
 type Contexto = {sesion:Sesion|null};
 type Turno = {destino:string;slotIndex:number;horaPlan:string;busNum:string;horaLlegada:string;horaReal:string;cancelado:number|boolean;eliminado:number|boolean;tipo:string|null;terminal:string|null;motivo:string;observacion:string;updatedAt:string;updatedBy:string};
 type Horario = {destino:string;slotIndex:number;horaPlan:string;tipo:string;terminal:string};
@@ -27,7 +27,7 @@ export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,
   const r=await env.DB.prepare("SELECT id,destino,slot_index AS slotIndex,usuario,momento,anterior,nuevo FROM actividad_dia WHERE fecha=? ORDER BY id DESC LIMIT 250").bind(dia.fecha).all();
   return json({fecha:dia.fecha,actividad:r.results});
  }
- const meta={...dia,now:Date.now(),usuario:data.sesion.usuario,rol:data.sesion.rol};
+ const meta={...dia,now:Date.now(),usuario:data.sesion.usuario,rol:data.sesion.rol,gpsHabilitado:env.GPS_ENABLED==="true"&&!!env.GPS_CACHE};
  if(estado.limpieza===dia.fecha && params.get("fecha")===dia.fecha && params.get("revision")===String(estado.revision)){
   return json({...meta,revision:estado.revision,sinCambios:true});
  }
