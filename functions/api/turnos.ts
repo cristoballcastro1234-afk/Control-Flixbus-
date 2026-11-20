@@ -1,3 +1,4 @@
+import {estacionesOficina} from "../lib/estaciones";
 import {OFICINAS,destinoValido,type Oficina} from "../lib/oficinas";
 
 import { diaChile, limpiarDias, destinos, horaValida, json, cuerpo, origenValido } from "../lib/dia";
@@ -31,7 +32,7 @@ export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,
   return json({fecha:dia.fecha,actividad:r.results});
  }
  const auto=false; // No consultas GPS externas en el piloto.
- const meta={...dia,now:Date.now(),usuario:data.sesion.usuario,rol:data.sesion.rol,gpsHabilitado:false,oficina:data.office,oficinaNombre:OFICINAS[data.office].nombre,destinos:OFICINAS[data.office].destinos,oficinas:Object.entries(OFICINAS).filter(([id])=>data.sesion!.rol==="admin"||id===data.office).map(([id,o])=>({id,nombre:o.nombre}))};
+ const meta={...dia,now:Date.now(),usuario:data.sesion.usuario,rol:data.sesion.rol,gpsHabilitado:false,estaciones:estacionesOficina(data.office),oficina:data.office,oficinaNombre:OFICINAS[data.office].nombre,destinos:OFICINAS[data.office].destinos,oficinas:Object.entries(OFICINAS).filter(([id])=>data.sesion!.rol==="admin"||id===data.office).map(([id,o])=>({id,nombre:o.nombre}))};
  if(estado.limpieza===dia.fecha && params.get("fecha")===dia.fecha && params.get("revision")===String(estado.revision)){
   return json({...meta,revision:estado.revision,sinCambios:true});
  }

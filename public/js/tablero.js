@@ -72,7 +72,13 @@ function configureOffice(d){
  select.value=oficinaActual;select.hidden=d.oficinas.length<2;
  const tabs=$("destinos");tabs.replaceChildren();for(const [id,label] of [["","Todos"],...Object.entries(DEST)]){const b=elem("button","",label);b.dataset.destino=id;b.setAttribute("aria-pressed",String(!id));tabs.append(b)}
  for(const el of [$("formExtra").elements.destino,$("destinoHorario")]){el.replaceChildren();for(const [id,label] of Object.entries(DEST)){const opt=elem("option","",label);opt.value=id;el.append(opt)}}
- document.querySelector(".gps-directo").hidden=oficinaActual!=="sanfernando";
+ const gps=$("gpsEnlaces");gps.replaceChildren();
+ for(const e of (Array.isArray(d.estaciones)?d.estaciones:[])){
+  if(!e||typeof e.id!=="string"||!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(e.id)||typeof e.nombre!=="string")continue;
+  const a=elem("a","secondary gps-directo","GPS oficial · "+e.nombre+" ↗");
+  a.href="https://www.flixbus.cl/track/station/"+e.id+"/departures";a.target="_blank";a.rel="noopener noreferrer";gps.append(a);
+ }
+ gps.hidden=!gps.childElementCount;
 }
 function schedulePoll(){clearTimeout(refreshTimer);if(document.hidden||logout)return;refreshTimer=setTimeout(async()=>{await refresh();schedulePoll()},wsConnected?120000:60000)}
 function stopRealtime(){
