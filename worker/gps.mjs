@@ -62,13 +62,15 @@ export function asignarHorarios(rows,base,turnos,prev){
  const antiguos=prev?.reservas||[],reservas=new Map(antiguos.map(r=>[r.rideId,r]));
  const usados=new Set(antiguos.map(slotKey)),ocupados=new Set([...base,...turnos].map(slotKey));
  const visibles=[];
+ const porSlotTurno=new Map(turnos.map(r=>[slotKey(r),r]));
  for(const raw of [...rows].sort((a,b)=>a.horaPlan.localeCompare(b.horaPlan)||a.rideId.localeCompare(b.rideId))){
   const r=plano(raw),old=reservas.get(r.rideId);
   let slotIndex;
-  if(old&&old.destino===r.destino)slotIndex=old.slotIndex;
+  if(old&&old.destino!==r.destino)throw Error("Carrera cambió de destino");
+  if(old)slotIndex=old.slotIndex;
   else {
    const candidatos=(list)=>list.filter(x=>horarioKey(x)===horarioKey(r)&&!usados.has(slotKey(x)));
-   const t=candidatos(turnos),b=candidatos(base);
+   const t=candidatos(turnos),b=candidatos(base).filter(x=>{const t=porSlotTurno.get(slotKey(x));return !t||horarioKey(t)===horarioKey(r)});
    // Si hay registros diarios distintos para el mismo horario, no adivinar.
    if(t.length>1||(!t.length&&b.length>1))throw Error("Horario ambiguo");
    if(t.length===1)slotIndex=t[0].slotIndex;
@@ -81,6 +83,7 @@ export function asignarHorarios(rows,base,turnos,prev){
   const mapped={...r,slotIndex};
   usados.add(slotKey(mapped));reservas.set(r.rideId,mapped);visibles.push(mapped);
  }
+ if(reservas.size>600)throw Error("Demasiados cambios de programación");
  return {visibles,reservas:[...reservas.values()]};
 }
 async function consultar(env,from,to){
@@ -110,6 +113,11 @@ async function actualizarPrograma(env,now,fecha,grupo){
  const prev=p.results[0]?JSON.parse(p.results[0].datos):null;
  if(!validarCobertura(dato.rows,b.results)|| (prev&&!validarCobertura(dato.rows,prev.visibles)))throw Error("Cobertura incompleta: se conserva programación anterior");
  const nuevo=asignarHorarios(dato.rows,b.results,t.results,prev);
+ // Confirmar ausencias en dos respuestas completas consecutivas para evitar
+ // quitar un servicio por un fallo transitorio del proveedor.
+ const missing=new Set(prev?.ausencias||[]),present=new Set(nuevo.visibles.map(r=>r.rideId)),ausencias=[];
+ for(const old of prev?.visibles||[]){if(!present.has(old.rideId)&&!missing.has(old.rideId)){if(nuevo.visibles.some(r=>horarioKey(r)===horarioKey(old)))throw Error("Identidad de servicio ambigua");nuevo.visibles.push(old);ausencias.push(old.rideId)}}
+ nuevo.visibles.sort((a,b)=>a.horaPlan.localeCompare(b.horaPlan)||a.rideId.localeCompare(b.rideId));nuevo.ausencias=ausencias.sort();
  const datos=JSON.stringify(nuevo);
  if(local(new Date().toISOString()).fecha!==fecha)return;
  // No incrementar revisión cuando el horario no ha cambiado. La telemetría está en KV.

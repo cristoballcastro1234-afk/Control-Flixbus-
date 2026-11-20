@@ -11,7 +11,7 @@
     "db:migrate:v2:existing": "wrangler d1 execute flixbus-turnos-db --remote --file=./migrations/0005_control_v2.sql",
     "typecheck": "tsc --noEmit",
     "deploy:limpieza": "wrangler deploy --config wrangler.limpieza.toml",
-    "test": "node --test tests/control.test.cjs"
+    "test": "node --test tests/control.test.cjs tests/gps.test.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.36.4"

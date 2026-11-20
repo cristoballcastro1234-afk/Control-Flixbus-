@@ -47,7 +47,7 @@ export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,
  if(!Number.isSafeInteger(revision))return json({error:"Revisión inválida"},503);
  const respaldo=h.results as Horario[], ts=t.results as Turno[];
  const oficial=programa((o?.results[0] as {datos:string}|undefined)?.datos);
- const hs=oficial?.visibles||respaldo;
+ const hs=oficial?oficial.visibles.map(r=>({destino:r.destino,slotIndex:r.slotIndex,horaPlan:r.horaPlan,tipo:r.tipo,terminal:r.terminal})):respaldo;
  const porId=new Map(ts.map(r=>[r.destino+":"+r.slotIndex,r]));
  const rows=hs.map(r=>{
   const k=r.destino+":"+r.slotIndex;
@@ -64,7 +64,8 @@ export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,
  }
  for(const r of porId.values()){
   const h=porHora.get(r.destino+":"+r.horaPlan.padStart(5,"0"));
-  rows.push({...vista(r,h??undefined),manual:true});
+  const anterior=oficial?.reservas.find(x=>x.destino===r.destino&&x.slotIndex===r.slotIndex);
+  rows.push({...vista(r,anterior||h||undefined),manual:true});
  }
  return json({...meta,now:Date.now(),revision,programacionOficial:!!oficial,programados:hs.length,rows});
 };
