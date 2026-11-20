@@ -208,7 +208,7 @@ BEGIN UPDATE sync_estado SET revision=revision+1 WHERE id=1; END;
 CREATE TRIGGER IF NOT EXISTS sync_oficial_delete AFTER DELETE ON programacion_oficial
 BEGIN UPDATE sync_estado SET revision=revision+1 WHERE id=1; END;
 
-ALTER TABLE usuarios ADD COLUMN oficina TEXT NOT NULL DEFAULT 'sanfernando' CHECK(oficina IN ('sanfernando','santiago','curico','rancagua'));
+ALTER TABLE usuarios ADD COLUMN oficina TEXT NOT NULL DEFAULT 'sanfernando' CHECK(oficina IN ('sanfernando','santiago','curico','rancagua','santacruz'));
 DROP TRIGGER sync_horarios_insert;
 DROP TRIGGER sync_horarios_update;
 DROP TRIGGER sync_horarios_delete;
