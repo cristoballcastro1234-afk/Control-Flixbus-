@@ -23,3 +23,5 @@ Admin global, operadores limitados a una oficina, horarios y actividad separados
 - El horario *scheduled* oficial no se confunde con el ETA estimado: se presenta la estimación aparte. El identificador de carrera se conserva entre cambios de hora para no perder máquinas, horarios reales ni cancelaciones. Los servicios retirados se confirman en dos lecturas válidas; los registros de turnos no se borran.
 - La página piloto lee `programacion_oficial` en la base de cada oficina. El nuevo Worker no usa el cache ni la clave del Worker oficial de San Fernando, y las consultas del proveedor no se efectúan desde navegadores de trabajadores.
 - Aún hay que comprobar acceso API permitido, rutas/terminales, cobertura diaria completa por oficina, ausencia de duplicados, cron, cuotas del plan y sincronización entre dispositivos antes de habilitar escritura automática o fusionar a producción.
+
+- Cloudflare Worker Builds: usar Build command `node --check worker/gps-piloto.mjs` (no escribir `None`, Cloudflare lo intenta ejecutar literalmente); Deploy command `npx wrangler deploy --config wrangler.gps-piloto.toml`.
