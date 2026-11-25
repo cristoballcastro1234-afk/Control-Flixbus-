@@ -1,4 +1,0 @@
-name = "control-flixbus-piloto"
-compatibility_date = "2026-04-07"
-pages_build_output_dir = "public"
-# Solo bindings de prueba, configurar PILOT_* y REALTIME en proyecto nuevo.
