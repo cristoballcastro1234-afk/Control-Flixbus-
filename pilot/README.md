@@ -8,3 +8,8 @@ NO fusionar a main ni usar datos reales. El piloto falla cerrado sin PILOT_DB y 
 5. Crear admin de prueba y operadores por oficina. Comprobar aislamiento cambiando URL y oficina, dos dispositivos simultáneos, guardados concurrentes, desconexiones, revocación, medianoche, cuotas, pruebas de carga. No introducir datos reales.
 ## Alcance
 Admin global, operadores limitados a una oficina, horarios y actividad separados, destinos iniciales provisionales para las nuevas oficinas (validar con cada terminal). GPS deshabilitado en piloto; GPS real de main no cambia. Enlaces públicos registrados para San Fernando, Curicó, Rancagua, Santiago Terminal Sur y Santa Cruz; las cinco oficinas tienen acceso directo en su tablero. Santiago solo Terminal Sur. Pendiente autorización de reutilización, normalización, horarios completos y consumo GPS por terminal. No se presume acceso técnico ni autorización para nuevas estaciones. Sincronización notifica e invalida; cada cliente consulta su propia API autenticada; no es cero consultas. Medir cambios y lecturas D1 para 22 o más dispositivos. No fusionar a producción sin revisión, migración y prueba de reversión.
+
+## Instalación piloto confirmada (2026-11-25)
+- Cloudflare Pages `control-flixbus-piloto` con cinco bindings D1 separados y secretos `SESSION_SECRET`, `SETUP_TOKEN` (no almacenar valores en Git).
+- Worker `flixbus-realtime-piloto` conectado a la rama piloto; desplegó `OfficeHub` SQLite y el binding `REALTIME` fue añadido a Pages.
+- La instalación técnica no sustituye pruebas de autorización por oficina, WebSocket desde clientes reales, limpieza diaria ni GPS de estaciones nuevas. Mantener piloto sin datos reales.
