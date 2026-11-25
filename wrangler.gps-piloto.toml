@@ -1,0 +1,39 @@
+# GPS oficial independiente del piloto. Jamás desplegar con el nombre del Worker GPS productivo.
+name = "flixbus-gps-piloto"
+main = "worker/gps-piloto.mjs"
+compatibility_date = "2026-04-07"
+workers_dev = false
+preview_urls = false
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[d1_databases]]
+binding = "PILOT_DB"
+database_name = "flixbus-piloto-sf"
+database_id = "2377ffd4-59ac-454b-a092-4a7cdebb2c54"
+
+[[d1_databases]]
+binding = "PILOT_SANTIAGO"
+database_name = "flixbus-piloto-stgo"
+database_id = "df70cdb1-8d40-4b51-b545-5a9f1fb149b9"
+
+[[d1_databases]]
+binding = "PILOT_CURICO"
+database_name = "flixbus-piloto-curico"
+database_id = "533ca6df-04b4-42ba-99cc-b78ccb69417c"
+
+[[d1_databases]]
+binding = "PILOT_RANCAGUA"
+database_name = "flixbus-piloto-rgua"
+database_id = "43fb747b-a877-43fd-a709-ca224ff952be"
+
+[[d1_databases]]
+binding = "PILOT_SANTACRUZ"
+database_name = "flixbus-piloto-scrz"
+database_id = "6a535988-d423-4a20-ba4d-1b24c1e5776d"
+
+[[durable_objects.bindings]]
+name = "REALTIME"
+class_name = "OfficeHub"
+script_name = "flixbus-realtime-piloto"
