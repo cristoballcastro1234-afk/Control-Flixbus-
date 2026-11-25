@@ -117,6 +117,7 @@
         <input type="password" id="password" name="password" autocomplete="current-password" required>
         <p id="ayuda-password" class="ayuda" style="display:none">Mínimo 10 caracteres.</p>
 
+        <div id="clave-setup" style="display:none"><label for="claveActivacion">Clave de activación del piloto</label><input id="claveActivacion" type="password" autocomplete="off" placeholder="Clave que configuramos en Cloudflare"></div>
         <button type="submit" id="boton">Entrar</button>
     </form>
 </div>
@@ -152,6 +153,8 @@
                     document.getElementById("subtitulo").textContent = "Crear el primer administrador";
                     document.getElementById("aviso-setup").style.display = "block";
                     document.getElementById("ayuda-password").style.display = "block";
+                    document.getElementById("clave-setup").style.display = "block";
+                    document.getElementById("claveActivacion").required = true;
                     document.getElementById("password").setAttribute("autocomplete", "new-password");
                     elBoton.textContent = "Crear administrador";
                 }
@@ -173,6 +176,7 @@
                 accion: modoSetup ? "setup" : "login",
                 usuario: document.getElementById("usuario").value,
                 password: document.getElementById("password").value,
+                ...(modoSetup ? {claveActivacion: document.getElementById("claveActivacion").value} : {}),
             }),
         })
             .then(function (respuesta) {
