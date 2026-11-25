@@ -1,0 +1,23 @@
+name: Piloto GPS - verificaciones
+on:
+  push:
+    branches:
+      - v3-multioficina-piloto
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Pruebas unitarias del sistema y GPS
+        run: npm test
+      - name: Revisar sintaxis JavaScript del piloto
+        run: |
+          node --check worker/gps-piloto.mjs
+          node --check worker/realtime.mjs
+          node --check public/js/tablero.js
