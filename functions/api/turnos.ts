@@ -1,19 +1,19 @@
 import {estacionesOficina} from "../lib/estaciones";
 import {OFICINAS,destinoValido,type Oficina} from "../lib/oficinas";
 
-import { diaChile, limpiarDias, destinos, horaValida, json, cuerpo, origenValido } from "../lib/dia";
+import { diaChile, limpiarDias, horaValida, json, cuerpo, origenValido } from "../lib/dia";
 import type { Sesion } from "./auth";
 interface Env {DB:D1Database;GPS_CACHE?:KVNamespace;GPS_ENABLED?:string;GPS_AUTO_HORARIOS?:string}
 type Contexto = {sesion:Sesion|null;office:Oficina;officeDb:D1Database};
 type Turno = {destino:string;slotIndex:number;horaPlan:string;busNum:string;horaLlegada:string;horaReal:string;cancelado:number|boolean;eliminado:number|boolean;tipo:string|null;terminal:string|null;motivo:string;observacion:string;updatedAt:string;updatedBy:string};
 type Horario = {destino:string;slotIndex:number;horaPlan:string;tipo:string;terminal:string};
 type ProgramaOficial={visibles:Horario[];reservas:Horario[]};
-function programa(raw:unknown):ProgramaOficial|null{try{const p=JSON.parse(String(raw));const ok=(x:unknown)=>Array.isArray(x)&&x.length<=600&&x.every(r=>r&&destinos.has(r.destino)&&Number.isSafeInteger(r.slotIndex)&&r.slotIndex>=0&&horaValida(r.horaPlan));return ok(p.visibles)&&p.visibles.length>0&&ok(p.reservas)?p:null}catch{return null}}
+function programa(raw:unknown,office:Oficina):ProgramaOficial|null{try{const p=JSON.parse(String(raw));const ok=(x:unknown)=>Array.isArray(x)&&x.length<=600&&x.every(r=>r&&destinoValido(office,r.destino)&&Number.isSafeInteger(r.slotIndex)&&r.slotIndex>=0&&horaValida(r.horaPlan));return ok(p.visibles)&&p.visibles.length>0&&ok(p.reservas)?p:null}catch{return null}}
 const campos = {busNum:"bus_num",horaLlegada:"hora_llegada",horaReal:"hora_real",cancelado:"cancelado",eliminado:"eliminado",motivo:"motivo",observacion:"observacion"} as const;
 type Campo = keyof typeof campos;
 const seleccionar = "SELECT destino,slot_index AS slotIndex,hora_plan AS horaPlan,bus_num AS busNum,hora_llegada AS horaLlegada,hora_real AS horaReal,cancelado,eliminado,tipo,terminal,motivo,observacion,updated_at AS updatedAt,updated_by AS updatedBy FROM turnos";
 const horarios = "SELECT destino,slot_index AS slotIndex,hora_plan AS horaPlan,tipo,terminal FROM horarios";
-function vista(t:Turno,h?:Horario) {return {...t, horaPlan:t.horaPlan.padStart(5,"0"),cancelado:!!t.cancelado,eliminado:!!t.eliminado,tipo:t.destino==="stgo"?(h?h.tipo||"directo":t.tipo||"directo"):"",terminal:t.destino==="stgo"?(h?h.terminal||"sur":t.terminal||"sur"):"",manual:!h};}
+function vista(t:Turno,h?:Horario) {return {...t, horaPlan:(h?.horaPlan||t.horaPlan).padStart(5,"0"),cancelado:!!t.cancelado,eliminado:!!t.eliminado,tipo:t.destino==="stgo"?(h?h.tipo||"directo":t.tipo||"directo"):"",terminal:t.destino==="stgo"?(h?h.terminal||"sur":t.terminal||"sur"):"",manual:!h};}
 export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,request}) => {
  if(!data.sesion)return json({error:"No autenticado"},401);
  const dia=diaChile();
@@ -31,8 +31,8 @@ export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,
   const r=await data.officeDb.prepare("SELECT id,destino,slot_index AS slotIndex,usuario,momento,anterior,nuevo FROM actividad_dia WHERE fecha=? ORDER BY id DESC LIMIT 250").bind(dia.fecha).all();
   return json({fecha:dia.fecha,actividad:r.results});
  }
- const auto=false; // No consultas GPS externas en el piloto.
- const meta={...dia,now:Date.now(),usuario:data.sesion.usuario,rol:data.sesion.rol,gpsHabilitado:false,estaciones:estacionesOficina(data.office),oficina:data.office,oficinaNombre:OFICINAS[data.office].nombre,destinos:OFICINAS[data.office].destinos,oficinas:Object.entries(OFICINAS).filter(([id])=>data.sesion!.rol==="admin"||id===data.office).map(([id,o])=>({id,nombre:o.nombre}))};
+ const auto=true; // Solo usa programación oficial ya guardada en la D1 de esta oficina; NO realiza consultas externas.
+ const meta={...dia,now:Date.now(),usuario:data.sesion.usuario,rol:data.sesion.rol,gpsHabilitado:true,estaciones:estacionesOficina(data.office),oficina:data.office,oficinaNombre:OFICINAS[data.office].nombre,destinos:OFICINAS[data.office].destinos,oficinas:Object.entries(OFICINAS).filter(([id])=>data.sesion!.rol==="admin"||id===data.office).map(([id,o])=>({id,nombre:o.nombre}))};
  if(estado.limpieza===dia.fecha && params.get("fecha")===dia.fecha && params.get("revision")===String(estado.revision)){
   return json({...meta,revision:estado.revision,sinCambios:true});
  }
@@ -48,7 +48,7 @@ export const onRequestGet:PagesFunction<Env,string,Contexto> = async ({env,data,
  const revision=Number((rev.results[0] as {revision:number}|undefined)?.revision);
  if(!Number.isSafeInteger(revision))return json({error:"Revisión inválida"},503);
  const respaldo=h.results as Horario[], ts=t.results as Turno[];
- const oficial=programa((o?.results[0] as {datos:string}|undefined)?.datos);
+ const oficial=programa((o?.results[0] as {datos:string}|undefined)?.datos,data.office);
  const hs=oficial?oficial.visibles.map(r=>({destino:r.destino,slotIndex:r.slotIndex,horaPlan:r.horaPlan,tipo:r.tipo,terminal:r.terminal})):respaldo;
  const porId=new Map(ts.map(r=>[r.destino+":"+r.slotIndex,r]));
  const rows=hs.map(r=>{
@@ -104,9 +104,7 @@ export const onRequestPost:PagesFunction<Env,string,Contexto> = async ({env,data
  const pares=Object.entries(cambios as Record<string,unknown>);
  if(!pares.length||pares.some(([k,v])=>!Object.prototype.hasOwnProperty.call(campos,k)||!validar(k as Campo,v)))return json({error:"Datos inválidos"},400);
  let h=await data.officeDb.prepare(horarios+" WHERE destino=? AND slot_index=? AND grupo=?").bind(destino,id,dia.grupo).first<Horario>();
- if(false){
-  try{const o=await data.officeDb.prepare("SELECT datos FROM programacion_oficial WHERE id=1 AND fecha=?").bind(dia.fecha).first<{datos:string}>();const p=programa(o?.datos);h=p?.reservas.find(r=>r.destino===destino&&r.slotIndex===id)||h}catch{/* respaldo local */}
- }
+ try{const o=await data.officeDb.prepare("SELECT datos FROM programacion_oficial WHERE id=1 AND fecha=?").bind(dia.fecha).first<{datos:string}>();const oficial=programa(o?.datos,data.office);h=oficial?.reservas.find(r=>r.destino===destino&&r.slotIndex===id)||h}catch{/* respaldo local */}
  const existente=await data.officeDb.prepare(seleccionar+" WHERE fecha=? AND destino=? AND slot_index=?").bind(dia.fecha,destino,id).first<Turno>();
  if(!h&&!existente)return json({error:"Ese horario ya no existe"},404);
  const valores=pares.map(([k,v])=>typeof v==="boolean"?Number(v):v);
