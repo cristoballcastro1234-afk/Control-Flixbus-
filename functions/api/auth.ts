@@ -2,6 +2,7 @@ import {oficinaValida} from "../lib/oficinas";
 interface Env {
   PILOT_DB: D1Database;
   SESSION_SECRET: string;
+  SETUP_TOKEN?: string;
 }
 
 export interface Sesion {
@@ -197,6 +198,8 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
 
   // --- Primer administrador: solo funciona mientras no exista ningún usuario ---
   if (accion === "setup") {
+    if (!context.env.SETUP_TOKEN) return json({error:"Falta configurar la clave de activación del piloto"},503);
+    if (typeof payload.claveActivacion !== "string" || !comparacionSegura(payload.claveActivacion,context.env.SETUP_TOKEN)) return json({error:"Clave de activación incorrecta"},403);
     if ((await contarUsuarios(context.env)) > 0) {
       return json({ error: "El sistema ya tiene usuarios creados" }, 403);
     }
@@ -209,13 +212,14 @@ export const onRequestPost: PagesFunction<Env, string, { sesion: Sesion | null }
     if (errorPassword) return json({ error: errorPassword }, 400);
 
     const creadoEn = new Date().toISOString();
-    await context.env.PILOT_DB
+    const primerAdmin=await context.env.PILOT_DB
       .prepare(
         `INSERT INTO usuarios (usuario, nombre, password_hash, rol, activo, creado_en)
-         VALUES (?, ?, ?, 'admin', 1, ?)`,
+         SELECT ?, ?, ?, 'admin', 1, ? WHERE NOT EXISTS (SELECT 1 FROM usuarios LIMIT 1)`,
       )
       .bind(usuario, String(payload.nombre || usuario).slice(0, 60), await hashPassword(password), creadoEn)
       .run();
+    if(!primerAdmin.meta.changes)return json({error:"Ya existe un administrador"},409);
 
     const token = await crearToken(secreto, { usuario, rol: "admin", cuenta: creadoEn+":0" });
     return json({ ok: true, sesion: { usuario, rol: "admin" } }, 200, {
