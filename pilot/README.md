@@ -13,3 +13,13 @@ Admin global, operadores limitados a una oficina, horarios y actividad separados
 - Cloudflare Pages `control-flixbus-piloto` con cinco bindings D1 separados y secretos `SESSION_SECRET`, `SETUP_TOKEN` (no almacenar valores en Git).
 - Worker `flixbus-realtime-piloto` conectado a la rama piloto; desplegó `OfficeHub` SQLite y el binding `REALTIME` fue añadido a Pages.
 - La instalación técnica no sustituye pruebas de autorización por oficina, WebSocket desde clientes reales, limpieza diaria ni GPS de estaciones nuevas. Mantener piloto sin datos reales.
+
+
+## Horarios GPS dinámicos — versión de prueba
+- Código: `worker/gps-piloto.mjs`, configuración `wrangler.gps-piloto.toml`. Nuevo Worker separado `flixbus-gps-piloto`. La rama main y su Worker GPS permanecen intactos.
+- D1 piloto de cada oficina; consulta completa del día local **cada cinco minutos** mediante cron `*/5 * * * *` (no `0 */5 * * *`, que sería cada cinco horas).
+- Aún no hay conexión activa: requiere Secret `GPS_API_KEY` configurado con acceso permitido por el proveedor y variable `PILOT_GPS_ENABLED=true`. Verificar primero las cinco estaciones revisando los logs. `PILOT_AUTO_HORARIOS=true` autoriza reemplazar SOLO la programación diaria del piloto cuando los datos estén completos. Ambas banderas deben estar ausentes o en false durante despliegue inicial.
+- No se inventan horarios, no se adivinan destinos desconocidos, se rechazan respuestas parciales y se hace pausa automática si el proveedor responde 401, 403 o 429. Si no hay lectura válida se mantiene el último horario del día, o el respaldo local si aún no existe uno.
+- El horario *scheduled* oficial no se confunde con el ETA estimado: se presenta la estimación aparte. El identificador de carrera se conserva entre cambios de hora para no perder máquinas, horarios reales ni cancelaciones. Los servicios retirados se confirman en dos lecturas válidas; los registros de turnos no se borran.
+- La página piloto lee `programacion_oficial` en la base de cada oficina. El nuevo Worker no usa el cache ni la clave del Worker oficial de San Fernando, y las consultas del proveedor no se efectúan desde navegadores de trabajadores.
+- Aún hay que comprobar acceso API permitido, rutas/terminales, cobertura diaria completa por oficina, ausencia de duplicados, cron, cuotas del plan y sincronización entre dispositivos antes de habilitar escritura automática o fusionar a producción.
