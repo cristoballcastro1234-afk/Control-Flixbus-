@@ -25,3 +25,9 @@ Admin global, operadores limitados a una oficina, horarios y actividad separados
 - Aún hay que comprobar acceso API permitido, rutas/terminales, cobertura diaria completa por oficina, ausencia de duplicados, cron, cuotas del plan y sincronización entre dispositivos antes de habilitar escritura automática o fusionar a producción.
 
 - Cloudflare Worker Builds: usar Build command `node --check worker/gps-piloto.mjs` (no escribir `None`, Cloudflare lo intenta ejecutar literalmente); Deploy command `npx wrangler deploy --config wrangler.gps-piloto.toml`.
+
+### Verificación previa a escritura (piloto)
+- Con una credencial autorizada, activar solo PILOT_GPS_ENABLED=true inicialmente. Mantener PILOT_AUTO_HORARIOS=false y PILOT_AUTO_OFICINAS ausente. Se verifica normalización, cobertura disponible y asignación de slots contra D1 sin guardar programación ni notificar clientes. Los logs incluyen conteos por destino y respaldo, no la clave.
+- Contrastarlos con el horario oficial completo de cada estación (incluidos destinos intermedios, terminales y servicios simultáneos). Una base nueva vacía no demuestra cobertura completa. Revisar al menos dos consultas completas consecutivas y un cambio de jornada; los conteos son diagnóstico, no prueba de cobertura del proveedor.
+- Activar escritura solo para oficinas realmente verificadas: PILOT_AUTO_HORARIOS=true y PILOT_AUTO_OFICINAS con sus identificadores separados por coma (sanfernando,santiago,curico,rancagua,santacruz cuando todas estén verificadas). Sin esa lista no se escribe. Los nombres se refieren solo al piloto. Si se detectan servicios con el mismo destino y hora se conserva el respaldo hasta revisar la identidad en el tablero.
+- Para detener la escritura, poner PILOT_AUTO_HORARIOS=false. Para detener también consultas externas, PILOT_GPS_ENABLED=false. No copiar claves de producción sin autorización del proveedor ni habilitar planes de pago.

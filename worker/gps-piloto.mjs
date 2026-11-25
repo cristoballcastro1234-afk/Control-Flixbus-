@@ -66,6 +66,8 @@ export function normalizarEstacion(payload,oficina,now){
 }
 export function coberturaSegura(nuevos,base,anterior){
  if(!nuevos.length||nuevos.length>600)return false;
+ // El tablero identifica la telemetría por destino y hora: no admitir coincidencias ambiguas.
+ if(new Set(nuevos.map(r=>r.rideId)).size!==nuevos.length||new Set(nuevos.map(r=>r.destino+":"+r.horaPlan)).size!==nuevos.length)return false;
  const old=anterior?.visibles?.length?anterior.visibles:base;
  if(!Array.isArray(old)||!old.length)return true; // primera programación en una oficina nueva
  const present=new Set(nuevos.map(r=>r.destino));
@@ -109,7 +111,8 @@ async function consultar(env,id,from,to){
  if(res.status>=300&&res.status<400)throw Error("Redirección no permitida");
  if(!res.ok)throw Error("Proveedor HTTP "+res.status);
  const raw=await res.text();if(raw.length>2500000)throw Error("Respuesta demasiado grande");
- const data=JSON.parse(raw);if(!Array.isArray(data?.rides))throw Error("Sin lista rides");
+ let data;try{data=JSON.parse(raw)}catch{throw Error("JSON del proveedor no válido")}
+ if(!Array.isArray(data?.rides))throw Error("Sin lista rides");
  return data;
 }
 async function controlPausa(db){
@@ -120,10 +123,14 @@ async function controlPausa(db){
 async function guardarPausa(db,hasta){
  await db.prepare("INSERT INTO gps_control(id,pausado_hasta) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET pausado_hasta=excluded.pausado_hasta").bind(hasta).run();
 }
+// La activación de escritura es explícita por oficina, después de contrastar su horario.
+export function escrituraAutorizada(env,oficina){
+ return env.PILOT_AUTO_HORARIOS==="true"&&String(env.PILOT_AUTO_OFICINAS||"").split(",").map(x=>x.trim()).includes(oficina)&&Object.hasOwn(ESTACIONES,oficina);
+}
 async function sincronizarOficina(env,oficina,db,now,from,to){
  const station=ESTACIONES[oficina],dato=normalizarEstacion(await consultar(env,station.id,from,to),oficina,now);
  console.log("GPS piloto "+oficina+": "+dato.rows.length+" salidas reconocidas");
- if(!dato.rows.length||env.PILOT_AUTO_HORARIOS!=="true")return;
+ // La validación completa también se ejecuta en modo de solo lectura.
  const grupo=new Intl.DateTimeFormat("es-CL",{timeZone:"America/Santiago",weekday:"long"}).format(new Date(now))==="domingo"?"domingo":"semana";
  const [b,t,p]=await db.batch([
   db.prepare("SELECT destino,slot_index AS slotIndex,hora_plan AS horaPlan,tipo,terminal FROM horarios WHERE grupo=?").bind(grupo),
@@ -133,6 +140,9 @@ async function sincronizarOficina(env,oficina,db,now,from,to){
  let prev=null;
  try{if(p.results[0])prev=JSON.parse(p.results[0].datos)}catch{throw Error("Programación previa dañada; no sobrescribir")}
  const nuevo=generarPrograma(dato.rows,b.results,t.results,prev,now);
+ const counts=Object.fromEntries(station.destinos.map(d=>[d,dato.rows.filter(r=>r.destino===d).length]));
+ console.log("GPS piloto "+oficina+": validación local correcta; recibidos="+dato.rows.length+" respaldo="+b.results.length+" destinos="+JSON.stringify(counts));
+ if(!escrituraAutorizada(env,oficina)){console.log("GPS piloto "+oficina+": solo lectura, sin escritura de horarios");return}
  if(chile(Date.now()).fecha!==dato.fecha)return; // no trasladar servicios al día siguiente
  const result=await db.prepare("INSERT INTO programacion_oficial(id,fecha,datos) VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET fecha=excluded.fecha,datos=excluded.datos WHERE fecha<>excluded.fecha OR datos<>excluded.datos").bind(dato.fecha,JSON.stringify(nuevo)).run();
  if(result.meta.changes){
@@ -151,7 +161,8 @@ export default {
   if(hasta>now){console.log("GPS piloto en pausa de proveedor");return}
   const [from,to]=rangoDiaChile(now);
   const officeDB={sanfernando:env.PILOT_DB,santiago:env.PILOT_SANTIAGO,curico:env.PILOT_CURICO,rancagua:env.PILOT_RANCAGUA,santacruz:env.PILOT_SANTACRUZ};
-  const resultados=await Promise.allSettled(Object.entries(officeDB).filter(([,db])=>!!db).map(async([office,db])=>{
+  if(Object.values(officeDB).some(db=>!db)){console.warn("GPS piloto: faltan bindings D1; se detiene");return}
+  const resultados=await Promise.allSettled(Object.entries(officeDB).map(async([office,db])=>{
    try{await sincronizarOficina(env,office,db,now,from,to)}
    catch(e){if([401,403,429].includes(e?.codigo)){try{await guardarPausa(env.PILOT_DB,now+(e.codigo===429?3600000:21600000))}catch{}}
     console.warn("GPS piloto "+office+": "+(e?.codigo?"acceso/límite del proveedor":e?.message||"consulta fallida"))}

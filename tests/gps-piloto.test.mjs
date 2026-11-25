@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {ESTACIONES,rangoDiaChile,normalizarEstacion,coberturaSegura,generarPrograma} from "../worker/gps-piloto.mjs";
+import {ESTACIONES,rangoDiaChile,normalizarEstacion,coberturaSegura,generarPrograma,escrituraAutorizada} from "../worker/gps-piloto.mjs";
 const now=Date.parse("2026-11-20T11:44:00Z");
 const s=ESTACIONES;
 const mk=(id,office,city,code,hora="2026-11-20T11:30:00Z")=>({id,calls:[
@@ -50,4 +50,20 @@ test("Una revisión de GPS cambia la hora sin perder el índice del turno ya reg
  assert.equal(moved.visibles[0].slotIndex,42);
  assert.equal(moved.visibles[0].horaPlan,"08:45");
  assert.equal(moved.actualizado,now+300000);
+});
+
+test("La escritura exige ambas autorizaciones y se limita a oficinas verificadas",()=>{
+ assert.equal(escrituraAutorizada({PILOT_AUTO_HORARIOS:"true"},"curico"),false);
+ assert.equal(escrituraAutorizada({PILOT_AUTO_OFICINAS:"curico"},"curico"),false);
+ const env={PILOT_AUTO_HORARIOS:"true",PILOT_AUTO_OFICINAS:"curico, rancagua, desconocida"};
+ assert.equal(escrituraAutorizada(env,"curico"),true);
+ assert.equal(escrituraAutorizada(env,"rancagua"),true);
+ assert.equal(escrituraAutorizada(env,"sanfernando"),false);
+ assert.equal(escrituraAutorizada(env,"desconocida"),false);
+});
+test("Rechaza servicios ambiguos para la visualización incluso sin respaldo local",()=>{
+ const a={rideId:"a",destino:"cur",horaPlan:"08:30"};
+ assert.equal(coberturaSegura([a,{...a,rideId:"b"}],[],null),false);
+ assert.equal(coberturaSegura([a,{...a,horaPlan:"09:30"}],[],null),false);
+ assert.equal(coberturaSegura([a,{...a,rideId:"b",horaPlan:"09:30"}],[],null),true);
 });
