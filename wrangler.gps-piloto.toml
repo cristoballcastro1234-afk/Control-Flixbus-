@@ -4,6 +4,8 @@ main = "worker/gps-piloto.mjs"
 compatibility_date = "2026-04-07"
 workers_dev = false
 preview_urls = false
+# Preserve dashboard activation flags on pilot redeploys.
+keep_vars = true
 
 [triggers]
 crons = ["*/5 * * * *"]
@@ -37,3 +39,15 @@ database_id = "6a535988-d423-4a20-ba4d-1b24c1e5776d"
 name = "REALTIME"
 class_name = "OfficeHub"
 script_name = "flixbus-realtime-piloto"
+
+# Cron diagnostics on Workers Free; no traces/export or public endpoint.
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+head_sampling_rate = 1
+
+[observability.traces]
+enabled = false
